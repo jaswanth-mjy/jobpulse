@@ -38,8 +38,8 @@ PRODUCTION_REDIRECT_URI = "https://jobpulse.shramkavach.com/api/gmail/oauth/call
 
 def get_redirect_uri():
     """Get the OAuth redirect URI from environment or auto-detect."""
-    # Check environment variable first
-    env_uri = os.environ.get("OAUTH_REDIRECT_URI")
+    # Check environment variable first (strip to remove any whitespace/newlines)
+    env_uri = os.environ.get("OAUTH_REDIRECT_URI", "").strip()
     if env_uri:
         return env_uri
     
