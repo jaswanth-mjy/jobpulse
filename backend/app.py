@@ -859,9 +859,10 @@ def scan_status():
 def gmail_oauth_status():
     """Check if OAuth is configured on the server."""
     try:
-        from gmail_oauth import is_oauth_configured
+        from gmail_oauth import is_oauth_configured, get_redirect_uri
         return jsonify({
             "oauth_available": is_oauth_configured(),
+            "redirect_uri": get_redirect_uri(),
             "message": "OAuth 2.0 is available" if is_oauth_configured() else "OAuth not configured on server"
         })
     except Exception as e:
