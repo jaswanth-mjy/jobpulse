@@ -1,0 +1,31 @@
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="246" fill="url(#grad1)" stroke="#fff" stroke-width="8"/>
+  
+  <!-- Document/list icon -->
+  <rect x="148" y="128" width="216" height="256" rx="16" fill="#fff" opacity="0.9"/>
+  
+  <!-- Checkmark lines -->
+  <line x1="178" y1="178" x2="204" y2="178" stroke="#667eea" stroke-width="12" stroke-linecap="round"/>
+  <line x1="178" y1="220" x2="204" y2="220" stroke="#667eea" stroke-width="12" stroke-linecap="round"/>
+  <line x1="178" y1="262" x2="204" y2="262" stroke="#667eea" stroke-width="12" stroke-linecap="round"/>
+  <line x1="178" y1="304" x2="204" y2="304" stroke="#667eea" stroke-width="12" stroke-linecap="round"/>
+  
+  <!-- Content lines -->
+  <line x1="226" y1="178" x2="330" y2="178" stroke="#999" stroke-width="8" stroke-linecap="round"/>
+  <line x1="226" y1="220" x2="330" y2="220" stroke="#999" stroke-width="8" stroke-linecap="round"/>
+  <line x1="226" y1="262" x2="330" y2="262" stroke="#999" stroke-width="8" stroke-linecap="round"/>
+  <line x1="226" y1="304" x2="300" y2="304" stroke="#999" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- Pulse/heart icon in corner -->
+  <circle cx="320" cy="340" r="42" fill="#667eea"/>
+  <path d="M 320 328 Q 307 316 292 328 Q 292 344 320 362 Q 348 344 348 328 Q 333 316 320 328 Z" fill="#fff"/>
+</svg>
