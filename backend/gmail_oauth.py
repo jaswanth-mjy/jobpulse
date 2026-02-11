@@ -11,6 +11,11 @@ from datetime import datetime, timedelta
 from email import message_from_bytes
 from email.header import decode_header
 
+# Disable OAuthlib's HTTPS requirement for local testing
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+# Allow OAuth to work even when scopes change (Google adds extra scopes)
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
@@ -123,9 +128,13 @@ def exchange_code_for_tokens(authorization_code: str, state: str = None) -> dict
     Returns the credentials as a dict.
     """
     flow = create_oauth_flow(state)
+    # Allow scope changes (Google may add additional scopes)
     flow.fetch_token(code=authorization_code)
     
     credentials = flow.credentials
+    
+    # Get the actual scopes granted (may include extras from Google)
+    granted_scopes = list(credentials.scopes) if credentials.scopes else SCOPES
     
     return {
         "token": credentials.token,
