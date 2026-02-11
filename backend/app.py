@@ -11,6 +11,7 @@ from functools import wraps
 import traceback
 import bcrypt
 import jwt
+import json
 import os
 import threading
 from cryptography.fernet import Fernet
@@ -465,6 +466,7 @@ def gmail_accounts():
             result.append({
                 "id": str(acct["_id"]),
                 "email": acct["email"],
+                "auth_type": acct.get("auth_type", "app_password"),  # Default for legacy accounts
             })
         return jsonify({"accounts": result})
     except Exception as e:
@@ -537,6 +539,7 @@ def gmail_status():
 def gmail_scan():
     try:
         from gmail_service import scan_emails_for_account
+        from gmail_oauth import scan_emails_oauth
 
         db = get_db()
         accounts = list(db.gmail_config.find({"user_id": ObjectId(g.user_id)}))
@@ -551,18 +554,51 @@ def gmail_scan():
         all_applications = []
         for acct in accounts:
             try:
-                # Decrypt the stored app password
-                raw_password = acct["app_password"]
-                try:
-                    decrypted_pw = decrypt_value(raw_password)
-                except Exception:
-                    decrypted_pw = raw_password  # fallback for legacy unencrypted entries
+                auth_type = acct.get("auth_type", "app_password")
+                
+                if auth_type == "oauth":
+                    # Use OAuth credentials
+                    encrypted_creds = acct.get("oauth_credentials", "")
+                    if not encrypted_creds:
+                        print(f"No OAuth credentials for {acct['email']}")
+                        continue
+                    
+                    try:
+                        creds_json = decrypt_value(encrypted_creds)
+                        creds_dict = json.loads(creds_json)
+                    except Exception as e:
+                        print(f"Failed to decrypt OAuth credentials: {e}")
+                        continue
+                    
+                    apps, updated_creds = scan_emails_oauth(creds_dict, days_back, max_results)
+                    
+                    # Update stored credentials if refreshed
+                    if updated_creds:
+                        db.gmail_config.update_one(
+                            {"_id": acct["_id"]},
+                            {"$set": {"oauth_credentials": encrypt_value(json.dumps(updated_creds))}}
+                        )
+                    
+                    all_applications.extend(apps)
+                else:
+                    # Use App Password (IMAP)
+                    raw_password = acct.get("app_password", "")
+                    if not raw_password:
+                        print(f"No app password for {acct['email']}")
+                        continue
+                    
+                    try:
+                        decrypted_pw = decrypt_value(raw_password)
+                    except Exception:
+                        decrypted_pw = raw_password  # fallback for legacy unencrypted entries
 
-                apps = scan_emails_for_account(acct["email"], decrypted_pw,
-                                                days_back=days_back, max_results=max_results)
-                all_applications.extend(apps)
+                    apps = scan_emails_for_account(acct["email"], decrypted_pw,
+                                                    days_back=days_back, max_results=max_results)
+                    all_applications.extend(apps)
+                    
             except Exception as e:
                 print(f"Error scanning {acct['email']}: {e}")
+                traceback.print_exc()
 
         if not all_applications:
             return jsonify({
@@ -687,6 +723,7 @@ def _trigger_background_scan(user_id: str):
     def _do_scan():
         try:
             from gmail_service import scan_emails_for_account
+            from gmail_oauth import scan_emails_oauth
             _scan_status[user_id] = {"status": "scanning", "result": None}
 
             db = get_db()
@@ -698,13 +735,41 @@ def _trigger_background_scan(user_id: str):
             all_applications = []
             for acct in accounts:
                 try:
-                    raw_pw = acct["app_password"]
-                    try:
-                        pw = decrypt_value(raw_pw)
-                    except Exception:
-                        pw = raw_pw
-                    apps = scan_emails_for_account(acct["email"], pw, days_back=30, max_results=200)
-                    all_applications.extend(apps)
+                    auth_type = acct.get("auth_type", "app_password")
+                    
+                    if auth_type == "oauth":
+                        # Use OAuth credentials
+                        encrypted_creds = acct.get("oauth_credentials", "")
+                        if not encrypted_creds:
+                            continue
+                        try:
+                            creds_json = decrypt_value(encrypted_creds)
+                            creds_dict = json.loads(creds_json)
+                        except Exception:
+                            continue
+                        
+                        apps, updated_creds = scan_emails_oauth(creds_dict, days_back=30, max_results=200)
+                        
+                        # Update stored credentials if refreshed
+                        if updated_creds:
+                            db.gmail_config.update_one(
+                                {"_id": acct["_id"]},
+                                {"$set": {"oauth_credentials": encrypt_value(json.dumps(updated_creds))}}
+                            )
+                        
+                        all_applications.extend(apps)
+                    else:
+                        # Use App Password (IMAP)
+                        raw_pw = acct.get("app_password", "")
+                        if not raw_pw:
+                            continue
+                        try:
+                            pw = decrypt_value(raw_pw)
+                        except Exception:
+                            pw = raw_pw
+                        apps = scan_emails_for_account(acct["email"], pw, days_back=30, max_results=200)
+                        all_applications.extend(apps)
+                        
                 except Exception as e:
                     print(f"Background scan error for {acct['email']}: {e}")
 
@@ -784,6 +849,200 @@ def scan_status():
     """Check the status of a background scan triggered on login."""
     status = _scan_status.get(g.user_id, {"status": "idle", "result": None})
     return jsonify(status)
+
+
+# ============================================================
+#  GMAIL OAUTH 2.0 (No App Password Needed)
+# ============================================================
+
+@app.route("/api/gmail/oauth/status", methods=["GET"])
+def gmail_oauth_status():
+    """Check if OAuth is configured on the server."""
+    try:
+        from gmail_oauth import is_oauth_configured
+        return jsonify({
+            "oauth_available": is_oauth_configured(),
+            "message": "OAuth 2.0 is available" if is_oauth_configured() else "OAuth not configured on server"
+        })
+    except Exception as e:
+        return jsonify({"oauth_available": False, "message": str(e)})
+
+
+@app.route("/api/gmail/oauth/start", methods=["POST"])
+@require_auth
+def gmail_oauth_start():
+    """Start the OAuth 2.0 flow - returns authorization URL."""
+    try:
+        from gmail_oauth import is_oauth_configured, get_authorization_url
+        
+        if not is_oauth_configured():
+            return jsonify({"error": "OAuth is not configured on the server. Please use App Password method."}), 400
+        
+        # Use user_id as state for security
+        state = f"{g.user_id}"
+        auth_url, state = get_authorization_url(state)
+        
+        return jsonify({
+            "authorization_url": auth_url,
+            "state": state,
+            "message": "Redirect user to authorization_url to complete OAuth flow"
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to start OAuth: {str(e)}"}), 500
+
+
+@app.route("/api/gmail/oauth/callback", methods=["GET"])
+def gmail_oauth_callback():
+    """OAuth callback - exchanges code for tokens."""
+    try:
+        from gmail_oauth import exchange_code_for_tokens, test_oauth_connection
+        
+        code = request.args.get("code")
+        state = request.args.get("state")  # This is the user_id
+        error = request.args.get("error")
+        
+        if error:
+            # Redirect to frontend with error
+            return f"""
+            <html>
+            <head><title>OAuth Error</title></head>
+            <body>
+                <h2>Authentication Failed</h2>
+                <p>Error: {error}</p>
+                <script>
+                    window.opener?.postMessage({{ type: 'oauth_error', error: '{error}' }}, '*');
+                    setTimeout(() => window.close(), 3000);
+                </script>
+            </body>
+            </html>
+            """
+        
+        if not code or not state:
+            return jsonify({"error": "Missing authorization code or state"}), 400
+        
+        # Exchange code for tokens
+        creds_dict = exchange_code_for_tokens(code, state)
+        
+        # Test connection and get email
+        success, email_or_error, updated_creds = test_oauth_connection(creds_dict)
+        
+        if not success:
+            return f"""
+            <html>
+            <head><title>OAuth Error</title></head>
+            <body>
+                <h2>Connection Failed</h2>
+                <p>{email_or_error}</p>
+                <script>
+                    window.opener?.postMessage({{ type: 'oauth_error', error: '{email_or_error}' }}, '*');
+                    setTimeout(() => window.close(), 3000);
+                </script>
+            </body>
+            </html>
+            """
+        
+        email_address = email_or_error
+        final_creds = updated_creds or creds_dict
+        
+        # Store in database
+        db = get_db()
+        user_id = state  # state contains user_id
+        
+        # Check if already connected
+        existing = db.gmail_config.find_one({
+            "user_id": ObjectId(user_id),
+            "email": email_address
+        })
+        
+        if existing:
+            # Update existing entry
+            db.gmail_config.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {
+                    "oauth_credentials": encrypt_value(json.dumps(final_creds)),
+                    "auth_type": "oauth",
+                    "app_password": "",  # Clear app password if exists
+                }}
+            )
+        else:
+            # Create new entry
+            db.gmail_config.insert_one({
+                "user_id": ObjectId(user_id),
+                "email": email_address,
+                "auth_type": "oauth",
+                "oauth_credentials": encrypt_value(json.dumps(final_creds)),
+                "app_password": "",
+            })
+        
+        # Return success page that notifies opener window
+        return f"""
+        <html>
+        <head>
+            <title>Gmail Connected!</title>
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                       display: flex; justify-content: center; align-items: center; height: 100vh;
+                       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; }}
+                .card {{ background: white; padding: 40px; border-radius: 16px; text-align: center;
+                        box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; }}
+                h2 {{ color: #22c55e; margin-bottom: 10px; }}
+                p {{ color: #666; }}
+                .email {{ font-weight: bold; color: #333; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2>✅ Gmail Connected!</h2>
+                <p>Successfully connected <span class="email">{email_address}</span></p>
+                <p>This window will close automatically...</p>
+            </div>
+            <script>
+                window.opener?.postMessage({{ 
+                    type: 'oauth_success', 
+                    email: '{email_address}' 
+                }}, '*');
+                setTimeout(() => window.close(), 2000);
+            </script>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        traceback.print_exc()
+        error_msg = str(e).replace("'", "\\'")
+        return f"""
+        <html>
+        <head><title>OAuth Error</title></head>
+        <body>
+            <h2>Authentication Error</h2>
+            <p>{error_msg}</p>
+            <script>
+                window.opener?.postMessage({{ type: 'oauth_error', error: '{error_msg}' }}, '*');
+                setTimeout(() => window.close(), 5000);
+            </script>
+        </body>
+        </html>
+        """
+
+
+@app.route("/api/gmail/oauth/accounts", methods=["GET"])
+@require_auth
+def gmail_oauth_accounts():
+    """List all connected Gmail accounts (both OAuth and App Password)."""
+    try:
+        db = get_db()
+        accounts = list(db.gmail_config.find({"user_id": ObjectId(g.user_id)}))
+        result = []
+        for acct in accounts:
+            result.append({
+                "id": str(acct["_id"]),
+                "email": acct["email"],
+                "auth_type": acct.get("auth_type", "app_password"),  # Default to app_password for legacy
+            })
+        return jsonify({"accounts": result})
+    except Exception as e:
+        return jsonify({"accounts": [], "error": str(e)})
 
 
 # ============================================================

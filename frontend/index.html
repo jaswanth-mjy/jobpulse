@@ -639,9 +639,54 @@
                         </div>
                     </div>
 
-                    <div class="gmail-card setup-card" id="gmailSetupCard" style="display:none;">
+                    <!-- Auth Method Selection Card -->
+                    <div class="gmail-card setup-card" id="gmailAuthMethodCard" style="display:none;">
                         <div class="gmail-card-header">
                             <h2><i class="fas fa-plus-circle"></i> Add Gmail Account</h2>
+                            <button class="btn btn-ghost btn-sm" id="cancelAuthMethodBtn">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                        <div class="gmail-card-body">
+                            <p class="gmail-description" style="margin-bottom: 20px;">Choose how you'd like to connect your Gmail account:</p>
+                            
+                            <div class="auth-method-options">
+                                <!-- OAuth Option (Recommended) -->
+                                <div class="auth-method-card" id="oauthMethodCard">
+                                    <div class="auth-method-icon">
+                                        <i class="fab fa-google"></i>
+                                    </div>
+                                    <h3>Sign in with Google</h3>
+                                    <p class="auth-method-desc">
+                                        <span class="badge badge-success">Recommended</span><br>
+                                        Quick & secure — no passwords needed. Uses OAuth 2.0.
+                                    </p>
+                                    <button class="btn btn-primary btn-lg" id="startOAuthBtn">
+                                        <i class="fab fa-google"></i> Continue with Google
+                                    </button>
+                                </div>
+                                
+                                <!-- App Password Option -->
+                                <div class="auth-method-card">
+                                    <div class="auth-method-icon">
+                                        <i class="fas fa-key"></i>
+                                    </div>
+                                    <h3>Use App Password</h3>
+                                    <p class="auth-method-desc">
+                                        Manual setup with 16-character app password. Works without Google Cloud.
+                                    </p>
+                                    <button class="btn btn-secondary" id="showAppPasswordFormBtn">
+                                        <i class="fas fa-key"></i> Use App Password
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- App Password Setup Card -->
+                    <div class="gmail-card setup-card" id="gmailSetupCard" style="display:none;">
+                        <div class="gmail-card-header">
+                            <h2><i class="fas fa-key"></i> Connect with App Password</h2>
                             <button class="btn btn-ghost btn-sm" id="cancelAddAccountBtn">
                                 <i class="fas fa-times"></i> Cancel
                             </button>
@@ -671,7 +716,10 @@
                                 </div>
                                 <div class="gmail-actions">
                                     <button type="submit" class="btn btn-primary" id="connectGmailBtn">
-                                        <i class="fab fa-google"></i> Connect Account
+                                        <i class="fas fa-link"></i> Connect Account
+                                    </button>
+                                    <button type="button" class="btn btn-ghost" id="backToAuthMethodBtn">
+                                        <i class="fas fa-arrow-left"></i> Back
                                     </button>
                                 </div>
                             </form>

@@ -853,11 +853,15 @@ function renderAccountsList(accounts) {
 
     container.innerHTML = accounts.map(acct => {
         const initials = acct.email.charAt(0).toUpperCase();
+        const authBadge = acct.auth_type === 'oauth' 
+            ? '<span class="auth-type-badge oauth"><i class="fab fa-google"></i> OAuth</span>'
+            : '<span class="auth-type-badge app-password"><i class="fas fa-key"></i> App Password</span>';
         return `
             <div class="account-row" data-id="${acct.id}">
                 <div class="account-info">
                     <div class="account-icon">${esc(initials)}</div>
                     <span class="account-email">${esc(acct.email)}</span>
+                    ${authBadge}
                     <span class="account-badge"><i class="fas fa-check"></i> Connected</span>
                 </div>
                 <button class="account-remove-btn" data-id="${acct.id}" title="Remove account">
@@ -889,21 +893,139 @@ function renderAccountsList(accounts) {
     });
 }
 
-function setupGmailForm() {
-    const setupCard = $("#gmailSetupCard");
-    if (!setupCard) return;
+// Track if OAuth is available on the server
+let oauthAvailable = false;
 
-    $("#showAddAccountBtn")?.addEventListener("click", () => {
+async function checkOAuthStatus() {
+    try {
+        const res = await fetch(`${API}/gmail/oauth/status`);
+        const data = await res.json();
+        oauthAvailable = data.oauth_available === true;
+        
+        // Show/hide OAuth option based on availability
+        const oauthCard = $("#oauthMethodCard");
+        if (oauthCard) {
+            oauthCard.style.display = oauthAvailable ? "flex" : "none";
+            if (!oauthAvailable) {
+                oauthCard.innerHTML = `
+                    <div class="auth-method-icon" style="opacity: 0.5;">
+                        <i class="fab fa-google"></i>
+                    </div>
+                    <h3 style="opacity: 0.5;">Sign in with Google</h3>
+                    <p class="auth-method-desc" style="color: #888;">
+                        OAuth not configured on server. Use App Password method instead.
+                    </p>
+                `;
+            }
+        }
+    } catch (e) {
+        console.log("OAuth status check failed, defaulting to App Password only");
+        oauthAvailable = false;
+    }
+}
+
+function setupGmailForm() {
+    const authMethodCard = $("#gmailAuthMethodCard");
+    const setupCard = $("#gmailSetupCard");
+    if (!authMethodCard || !setupCard) return;
+    
+    // Check OAuth availability on load
+    checkOAuthStatus();
+
+    // Show auth method selection when clicking "Add Account"
+    $("#showAddAccountBtn")?.addEventListener("click", async () => {
+        await checkOAuthStatus(); // Refresh OAuth status
+        authMethodCard.style.display = "block";
+        setupCard.style.display = "none";
+    });
+
+    // Cancel from auth method selection
+    $("#cancelAuthMethodBtn")?.addEventListener("click", () => {
+        authMethodCard.style.display = "none";
+    });
+
+    // Start OAuth flow
+    $("#startOAuthBtn")?.addEventListener("click", async () => {
+        if (!oauthAvailable) {
+            showToast("OAuth is not configured on the server. Please use App Password.", "error");
+            return;
+        }
+        
+        const btn = $("#startOAuthBtn");
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+        
+        try {
+            const res = await authFetch(`${API}/gmail/oauth/start`, { method: "POST" });
+            const data = await res.json();
+            
+            if (res.ok && data.authorization_url) {
+                // Open OAuth window
+                const width = 600, height = 700;
+                const left = (screen.width - width) / 2;
+                const top = (screen.height - height) / 2;
+                
+                const oauthWindow = window.open(
+                    data.authorization_url,
+                    'Gmail OAuth',
+                    `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
+                );
+                
+                // Listen for OAuth completion
+                const handleMessage = async (event) => {
+                    if (event.data?.type === 'oauth_success') {
+                        showToast(`✅ ${event.data.email} connected via OAuth!`, "success");
+                        authMethodCard.style.display = "none";
+                        await checkGmailStatus();
+                        window.removeEventListener('message', handleMessage);
+                    } else if (event.data?.type === 'oauth_error') {
+                        showToast(`OAuth failed: ${event.data.error}`, "error");
+                        window.removeEventListener('message', handleMessage);
+                    }
+                };
+                window.addEventListener('message', handleMessage);
+                
+                // Check if window was closed without completing
+                const checkClosed = setInterval(() => {
+                    if (oauthWindow?.closed) {
+                        clearInterval(checkClosed);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fab fa-google"></i> Continue with Google';
+                    }
+                }, 500);
+                
+            } else {
+                showToast(data.error || "Failed to start OAuth", "error");
+            }
+        } catch (e) {
+            showToast("Failed to start OAuth flow", "error");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fab fa-google"></i> Continue with Google';
+        }
+    });
+
+    // Show App Password form
+    $("#showAppPasswordFormBtn")?.addEventListener("click", () => {
+        authMethodCard.style.display = "none";
         setupCard.style.display = "block";
         $("#gmailEmail").value = "";
         $("#gmailAppPassword").value = "";
         $("#gmailEmail").focus();
     });
 
+    // Back to auth method selection
+    $("#backToAuthMethodBtn")?.addEventListener("click", () => {
+        setupCard.style.display = "none";
+        authMethodCard.style.display = "block";
+    });
+
+    // Cancel from App Password form
     $("#cancelAddAccountBtn")?.addEventListener("click", () => {
         setupCard.style.display = "none";
     });
 
+    // App Password form submission
     $("#gmailConnectForm")?.addEventListener("submit", async (e) => {
         e.preventDefault();
 
@@ -932,7 +1054,7 @@ function setupGmailForm() {
             showToast("Connection failed. Is the backend running?", "error");
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fab fa-google"></i> Connect Account';
+            btn.innerHTML = '<i class="fas fa-link"></i> Connect Account';
         }
     });
 }
