@@ -68,13 +68,18 @@ def get_client_config() -> dict:
     if not client_id or not client_secret:
         raise ValueError("OAuth not configured. Add client_secrets.json or set GOOGLE_OAUTH_CLIENT_ID/SECRET env vars.")
     
+    redirect_uri = get_redirect_uri()
+    
     return {
         "web": {
             "client_id": client_id,
-            "client_secret": client_secret,
+            "project_id": "jobpulse",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [get_redirect_uri()],
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_secret": client_secret,
+            "redirect_uris": [redirect_uri],
+            "javascript_origins": [redirect_uri.rsplit('/api/', 1)[0]],
         }
     }
 
