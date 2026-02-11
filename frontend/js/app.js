@@ -1,0 +1,1014 @@
+/* ==========================================
+   JobPulse — Frontend JavaScript
+   With Auth, Landing Page, MongoDB
+   ========================================== */
+
+const API = window.location.hostname === "localhost"
+    ? "http://localhost:5050/api"
+    : `${window.location.origin}/api`;
+
+// Google OAuth Client ID — replace with your own from Google Cloud Console
+const GOOGLE_CLIENT_ID = "160223116353-vg7bu7da2t1ilb90uhd9h4o7qmirldf0.apps.googleusercontent.com";
+
+// ========== STATE ==========
+let allApplications = [];
+let platforms = [];
+let statuses = [];
+let authToken = localStorage.getItem("jobpulse_token") || null;
+let currentUser = JSON.parse(localStorage.getItem("jobpulse_user") || "null");
+
+// ========== DOM REFS ==========
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+// ========== AUTH HELPERS ==========
+function getAuthHeaders() {
+    return {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`,
+    };
+}
+
+function authFetch(url, options = {}) {
+    options.headers = { ...options.headers, ...getAuthHeaders() };
+    return fetch(url, options);
+}
+
+// ========== INIT ==========
+document.addEventListener("DOMContentLoaded", async () => {
+    // Mobile menu for landing
+    const menuBtn = $("#landingMenuBtn");
+    if (menuBtn) {
+        menuBtn.addEventListener("click", () => {
+            $("#landingMobileMenu").classList.toggle("open");
+        });
+    }
+
+    if (authToken && currentUser) {
+        // Verify token is still valid
+        try {
+            const res = await authFetch(`${API}/auth/me`);
+            if (res.ok) {
+                const data = await res.json();
+                currentUser = data.user;
+                showApp();
+                // Auto-scan on page load if Gmail connected
+                triggerAutoScanIfConnected();
+            } else {
+                clearAuth();
+                showLanding();
+            }
+        } catch {
+            showLanding();
+        }
+    } else {
+        showLanding();
+    }
+});
+
+// ========== SHOW/HIDE PAGES ==========
+function showLanding() {
+    $("#landingPage").style.display = "block";
+    $("#appContainer").style.display = "none";
+}
+
+function showApp() {
+    $("#landingPage").style.display = "none";
+    $("#appContainer").style.display = "flex";
+
+    // Update user info in sidebar
+    if (currentUser) {
+        $("#userName").textContent = currentUser.name || currentUser.email;
+    }
+
+    initApp();
+}
+
+async function initApp() {
+    await loadMeta();
+    await refreshData();
+    setupEventListeners();
+    checkGmailStatus();
+    setView("dashboard");
+}
+
+// ========== AUTH: Show/Hide Modal ==========
+function showAuth(mode) {
+    const overlay = $("#authOverlay");
+    overlay.classList.add("active");
+    $("#authError").style.display = "none";
+
+    if (mode === "signup") {
+        $("#signinForm").style.display = "none";
+        $("#signupForm").style.display = "block";
+    } else {
+        $("#signinForm").style.display = "block";
+        $("#signupForm").style.display = "none";
+    }
+}
+
+function hideAuth() {
+    $("#authOverlay").classList.remove("active");
+}
+
+function showAuthError(msg) {
+    const el = $("#authError");
+    el.textContent = msg;
+    el.style.display = "block";
+}
+
+// ========== GOOGLE SIGN-IN ==========
+let _googleInitialized = false;
+
+function initGoogleSignIn() {
+    if (_googleInitialized || !GOOGLE_CLIENT_ID || !window.google) return;
+    try {
+        google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleGoogleCredentialResponse,
+        });
+        _googleInitialized = true;
+    } catch (e) {
+        console.warn("Google Sign-In init failed:", e);
+    }
+}
+
+function triggerGoogleSignIn() {
+    if (!GOOGLE_CLIENT_ID) {
+        showAuthError("Google Sign-In is not configured yet. Please use email/password.");
+        return;
+    }
+    initGoogleSignIn();
+    if (_googleInitialized) {
+        google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                // Fallback: use the popup flow
+                google.accounts.id.prompt();
+            }
+        });
+    }
+}
+
+async function handleGoogleCredentialResponse(response) {
+    const credential = response.credential;
+    if (!credential) {
+        showAuthError("No credential received from Google.");
+        return;
+    }
+
+    // Disable both buttons while processing
+    const signinBtn = $("#googleSigninBtn");
+    const signupBtn = $("#googleSignupBtn");
+    if (signinBtn) { signinBtn.disabled = true; signinBtn.textContent = "Signing in..."; }
+    if (signupBtn) { signupBtn.disabled = true; signupBtn.textContent = "Signing in..."; }
+
+    try {
+        const res = await fetch(`${API}/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ credential }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            authToken = data.token;
+            currentUser = data.user;
+            localStorage.setItem("jobpulse_token", authToken);
+            localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            hideAuth();
+            showApp();
+            showToast(`Welcome, ${data.user.name}! 🎉`, "success");
+
+            if (data.auto_scan) {
+                showToast("📧 Auto-scanning Gmail for new applications...", "info");
+                pollScanStatus();
+            }
+        } else {
+            showAuthError(data.error || "Google sign-in failed.");
+        }
+    } catch (err) {
+        showAuthError("Network error. Is the backend running?");
+    } finally {
+        if (signinBtn) { signinBtn.disabled = false; signinBtn.innerHTML = '<svg class="google-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Continue with Google'; }
+        if (signupBtn) { signupBtn.disabled = false; signupBtn.innerHTML = '<svg class="google-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Sign up with Google'; }
+    }
+}
+
+// ========== AUTH: Sign Up ==========
+async function handleSignUp(e) {
+    e.preventDefault();
+    const btn = $("#signupBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Account...';
+    $("#authError").style.display = "none";
+
+    const name = $("#signupName").value.trim();
+    const email = $("#signupEmail").value.trim();
+    const password = $("#signupPassword").value;
+
+    try {
+        const res = await fetch(`${API}/auth/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            authToken = data.token;
+            currentUser = data.user;
+            localStorage.setItem("jobpulse_token", authToken);
+            localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            hideAuth();
+            showApp();
+            showToast("Account created! Welcome to JobPulse 🎉 Connect your Gmail to auto-import applications.", "success");
+        } else {
+            showAuthError(data.error || "Signup failed");
+        }
+    } catch (err) {
+        showAuthError("Network error. Is the backend running?");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+    }
+}
+
+// ========== AUTH: Sign In ==========
+async function handleSignIn(e) {
+    e.preventDefault();
+    const btn = $("#signinBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+    $("#authError").style.display = "none";
+
+    const email = $("#signinEmail").value.trim();
+    const password = $("#signinPassword").value;
+
+    try {
+        const res = await fetch(`${API}/auth/signin`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            authToken = data.token;
+            currentUser = data.user;
+            localStorage.setItem("jobpulse_token", authToken);
+            localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            hideAuth();
+            showApp();
+            showToast("Welcome back! 👋", "success");
+
+            // Auto-scan Gmail if connected
+            if (data.auto_scan) {
+                showToast("📧 Auto-scanning Gmail for new applications...", "info");
+                pollScanStatus();
+            }
+        } else {
+            showAuthError(data.error || "Invalid credentials");
+        }
+    } catch (err) {
+        showAuthError("Network error. Is the backend running?");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+    }
+}
+
+// ========== AUTH: Logout ==========
+function handleLogout() {
+    clearAuth();
+    showLanding();
+    showToast("Signed out successfully", "info");
+}
+
+function clearAuth() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem("jobpulse_token");
+    localStorage.removeItem("jobpulse_user");
+}
+
+// ========== LOAD METADATA ==========
+async function loadMeta() {
+    try {
+        const [pRes, sRes] = await Promise.all([
+            fetch(`${API}/platforms`),
+            fetch(`${API}/statuses`),
+        ]);
+        platforms = await pRes.json();
+        statuses = await sRes.json();
+
+        populateSelect($("#platform"), platforms);
+        populateSelect($("#status"), statuses);
+        populateSelect($("#filterPlatform"), platforms, true);
+        populateSelect($("#filterStatus"), statuses, true);
+    } catch (e) {
+        console.error("Failed to load metadata:", e);
+        showToast("Cannot connect to server. Is the backend running?", "error");
+    }
+}
+
+function populateSelect(el, items, hasAll = false) {
+    if (!el) return;
+    const existing = hasAll ? '<option value="">All</option>' : "";
+    el.innerHTML = existing + items.map((i) => `<option value="${i}">${i}</option>`).join("");
+}
+
+// ========== REFRESH DATA ==========
+async function refreshData() {
+    try {
+        const params = new URLSearchParams();
+        const platform = $("#filterPlatform")?.value;
+        const status = $("#filterStatus")?.value;
+        const search = $("#globalSearch")?.value;
+        const sortBy = $("#sortBy")?.value;
+        const order = $("#sortOrder")?.value;
+
+        if (platform) params.set("platform", platform);
+        if (status) params.set("status", status);
+        if (search) params.set("search", search);
+        if (sortBy) params.set("sort_by", sortBy);
+        if (order) params.set("order", order);
+
+        const res = await authFetch(`${API}/applications?${params}`);
+        if (res.status === 401) {
+            clearAuth();
+            showLanding();
+            return;
+        }
+        allApplications = await res.json();
+
+        renderDashboard();
+        renderApplicationsTable();
+    } catch (e) {
+        console.error("Failed to refresh data:", e);
+    }
+}
+
+// ========== EVENT LISTENERS ==========
+let _listenersSetup = false;
+function setupEventListeners() {
+    if (_listenersSetup) return;
+    _listenersSetup = true;
+
+    // Navigation
+    $$(".nav-item").forEach((item) => {
+        item.addEventListener("click", (e) => {
+            e.preventDefault();
+            setView(item.dataset.view);
+        });
+    });
+
+    // Quick add
+    $("#quickAddBtn").addEventListener("click", () => {
+        resetForm();
+        setView("add");
+    });
+
+    // Form submit
+    $("#applicationForm").addEventListener("submit", handleFormSubmit);
+
+    // Cancel
+    $("#cancelBtn").addEventListener("click", () => setView("applications"));
+
+    // Filters
+    ["filterPlatform", "filterStatus", "sortBy", "sortOrder"].forEach((id) => {
+        $(`#${id}`)?.addEventListener("change", refreshData);
+    });
+
+    // Search (debounced)
+    let searchTimer;
+    $("#globalSearch").addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(refreshData, 350);
+    });
+
+    // Modal close
+    $("#modalClose").addEventListener("click", closeModal);
+    $("#modalOverlay").addEventListener("click", (e) => {
+        if (e.target === $("#modalOverlay")) closeModal();
+    });
+
+    // Mobile menu
+    $("#menuToggle").addEventListener("click", () => {
+        $(".sidebar").classList.toggle("open");
+    });
+
+    // Gmail
+    $("#scanGmailBtn").addEventListener("click", () => setView("gmail"));
+    $("#startScanBtn").addEventListener("click", startGmailScan);
+    setupGmailForm();
+}
+
+// ========== VIEW SWITCHING ==========
+const views = {};
+function setView(name) {
+    // Lazy-cache view references
+    if (!views.dashboard) {
+        views.dashboard = $("#dashboardView");
+        views.applications = $("#applicationsView");
+        views.add = $("#addView");
+        views.gmail = $("#gmailView");
+    }
+
+    Object.values(views).forEach((v) => v?.classList.remove("active"));
+    views[name]?.classList.add("active");
+
+    $$(".nav-item").forEach((n) => n.classList.remove("active"));
+    $(`.nav-item[data-view="${name}"]`)?.classList.add("active");
+
+    const titles = { dashboard: "Dashboard", applications: "Applications", add: "Add Application", gmail: "Gmail Import" };
+    $("#pageTitle").textContent = titles[name] || "";
+
+    $(".sidebar").classList.remove("open");
+}
+
+// ========== DASHBOARD ==========
+async function renderDashboard() {
+    try {
+        const res = await authFetch(`${API}/stats`);
+        if (!res.ok) return;
+        const stats = await res.json();
+
+        $("#statTotal").textContent = stats.total;
+        const interviewCount =
+            (stats.by_status["Interview Scheduled"] || 0) +
+            (stats.by_status["Interviewed"] || 0) +
+            (stats.by_status["Phone Screen"] || 0) +
+            (stats.by_status["Technical Round"] || 0) +
+            (stats.by_status["HR Round"] || 0);
+        $("#statInterviews").textContent = interviewCount;
+        $("#statOffers").textContent = (stats.by_status["Offer Received"] || 0) + (stats.by_status["Accepted"] || 0);
+        $("#statRejected").textContent = stats.by_status["Rejected"] || 0;
+        $("#statResponseRate").textContent = stats.response_rate + "%";
+        $("#statGhosted").textContent = stats.by_status["Ghosted"] || 0;
+
+        renderPlatformChart(stats.by_platform);
+        renderStatusChart(stats.by_status);
+        renderRecentTable();
+    } catch (e) {
+        console.error("Dashboard error:", e);
+    }
+}
+
+// ========== PLATFORM BAR CHART ==========
+function renderPlatformChart(data) {
+    const container = $("#platformChart");
+    if (!container) return;
+    if (Object.keys(data).length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">No data yet</p>';
+        return;
+    }
+    const max = Math.max(...Object.values(data));
+    const colors = ["var(--accent-blue)", "var(--accent-purple)", "var(--accent-green)", "var(--accent-orange)", "var(--accent-pink)", "var(--accent-yellow)", "var(--accent-red)"];
+
+    let html = '<div class="bar-chart">';
+    Object.entries(data).forEach(([name, count], i) => {
+        const pct = (count / max) * 100;
+        const color = colors[i % colors.length];
+        html += `
+            <div class="bar-item">
+                <span class="bar-label">${name}</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:${pct}%;background:${color}">${count}</div>
+                </div>
+            </div>`;
+    });
+    html += "</div>";
+    container.innerHTML = html;
+}
+
+// ========== STATUS CHART ==========
+function renderStatusChart(data) {
+    const container = $("#statusChart");
+    if (!container) return;
+    if (Object.keys(data).length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">No data yet</p>';
+        return;
+    }
+    const colorMap = {
+        Applied: "var(--accent-blue)", Viewed: "var(--accent-purple)", "In Review": "var(--accent-yellow)",
+        "Phone Screen": "var(--accent-pink)", "Interview Scheduled": "#7c3aed", Interviewed: "#8b5cf6",
+        "Technical Round": "var(--accent-orange)", "HR Round": "#d946ef",
+        "Offer Received": "var(--accent-green)", Accepted: "#34d399",
+        Rejected: "var(--accent-red)", Withdrawn: "#6b7280", Ghosted: "#9ca3af",
+    };
+
+    let html = '<div class="donut-chart">';
+    Object.entries(data).forEach(([name, count]) => {
+        const color = colorMap[name] || "var(--text-muted)";
+        html += `
+            <div class="donut-item">
+                <span class="donut-color" style="background:${color}"></span>
+                <span class="donut-count">${count}</span>
+                <span class="donut-name">${name}</span>
+            </div>`;
+    });
+    html += "</div>";
+    container.innerHTML = html;
+}
+
+// ========== RECENT TABLE ==========
+function renderRecentTable() {
+    const tbody = $("#recentTable tbody");
+    if (!tbody) return;
+    const recent = allApplications.slice(0, 5);
+
+    if (recent.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:30px;">No applications yet</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = recent.map((app) => `
+        <tr style="cursor:pointer" onclick="viewApplication('${app.id}')">
+            <td class="company-cell">${esc(app.company)}</td>
+            <td>${esc(app.role)}</td>
+            <td>${platformBadge(app.platform)}</td>
+            <td>${statusBadge(app.status)}</td>
+            <td>${formatDate(app.applied_date)}</td>
+        </tr>`).join("");
+}
+
+// ========== APPLICATIONS TABLE ==========
+function renderApplicationsTable() {
+    const tbody = $("#applicationsTable tbody");
+    const empty = $("#emptyState");
+    if (!tbody) return;
+
+    if (allApplications.length === 0) {
+        tbody.innerHTML = "";
+        if (empty) empty.style.display = "block";
+        return;
+    }
+
+    if (empty) empty.style.display = "none";
+    tbody.innerHTML = allApplications.map((app) => `
+        <tr>
+            <td class="company-cell">${esc(app.company)}</td>
+            <td>${esc(app.role)}</td>
+            <td>${platformBadge(app.platform)}</td>
+            <td>${statusBadge(app.status)}</td>
+            <td>${esc(app.location || "—")}</td>
+            <td>${esc(app.salary || "—")}</td>
+            <td>${formatDate(app.applied_date)}</td>
+            <td>
+                <div class="action-btns">
+                    <button class="action-btn" title="View" onclick="viewApplication('${app.id}')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="action-btn" title="Edit" onclick="editApplication('${app.id}')">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="action-btn delete" title="Delete" onclick="deleteApplication('${app.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`).join("");
+}
+
+// ========== FORM HANDLING ==========
+async function handleFormSubmit(e) {
+    e.preventDefault();
+
+    const data = {
+        company: $("#company").value.trim(),
+        role: $("#role").value.trim(),
+        platform: $("#platform").value,
+        status: $("#status").value,
+        salary: $("#salary").value.trim(),
+        location: $("#location").value.trim(),
+        job_url: $("#jobUrl").value.trim(),
+        notes: $("#notes").value.trim(),
+        applied_date: $("#appliedDate").value || new Date().toISOString().split("T")[0],
+        interview_date: $("#interviewDate").value,
+        response_date: $("#responseDate").value,
+    };
+
+    const editId = $("#editId").value;
+
+    try {
+        let res;
+        if (editId) {
+            res = await authFetch(`${API}/applications/${editId}`, {
+                method: "PUT",
+                body: JSON.stringify(data),
+            });
+        } else {
+            res = await authFetch(`${API}/applications`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            });
+        }
+
+        const result = await res.json();
+        if (res.ok) {
+            showToast(editId ? "Application updated!" : "Application added!", "success");
+            resetForm();
+            await refreshData();
+            setView("applications");
+        } else {
+            showToast(result.error || "Something went wrong", "error");
+        }
+    } catch (e) {
+        showToast("Network error. Is the server running?", "error");
+    }
+}
+
+function resetForm() {
+    $("#applicationForm").reset();
+    $("#editId").value = "";
+    $("#formTitle").innerHTML = '<i class="fas fa-plus-circle"></i> Add New Application';
+    $("#submitBtn").innerHTML = '<i class="fas fa-save"></i> Save Application';
+    $("#appliedDate").value = new Date().toISOString().split("T")[0];
+}
+
+// ========== EDIT ==========
+async function editApplication(id) {
+    try {
+        const res = await authFetch(`${API}/applications/${id}`);
+        const app = await res.json();
+
+        $("#editId").value = app.id;
+        $("#company").value = app.company;
+        $("#role").value = app.role;
+        $("#platform").value = app.platform;
+        $("#status").value = app.status;
+        $("#salary").value = app.salary || "";
+        $("#location").value = app.location || "";
+        $("#jobUrl").value = app.job_url || "";
+        $("#notes").value = app.notes || "";
+        $("#appliedDate").value = app.applied_date || "";
+        $("#interviewDate").value = app.interview_date || "";
+        $("#responseDate").value = app.response_date || "";
+
+        $("#formTitle").innerHTML = '<i class="fas fa-edit"></i> Edit Application';
+        $("#submitBtn").innerHTML = '<i class="fas fa-save"></i> Update Application';
+
+        setView("add");
+    } catch (e) {
+        showToast("Failed to load application", "error");
+    }
+}
+
+// ========== DELETE ==========
+async function deleteApplication(id) {
+    if (!confirm("Are you sure you want to delete this application?")) return;
+
+    try {
+        const res = await authFetch(`${API}/applications/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast("Application deleted!", "success");
+            await refreshData();
+        } else {
+            showToast("Failed to delete", "error");
+        }
+    } catch (e) {
+        showToast("Network error", "error");
+    }
+}
+
+// ========== VIEW MODAL ==========
+async function viewApplication(id) {
+    try {
+        const res = await authFetch(`${API}/applications/${id}`);
+        const app = await res.json();
+
+        $("#modalTitle").textContent = `${app.company} — ${app.role}`;
+
+        const fields = [
+            ["Company", app.company],
+            ["Role", app.role],
+            ["Platform", platformBadge(app.platform)],
+            ["Status", statusBadge(app.status)],
+            ["Location", app.location || "—"],
+            ["Salary", app.salary || "—"],
+            ["Job URL", app.job_url ? `<a href="${esc(app.job_url)}" target="_blank">${esc(app.job_url)}</a>` : "—"],
+            ["Applied Date", formatDate(app.applied_date)],
+            ["Interview Date", app.interview_date ? formatDate(app.interview_date) : "—"],
+            ["Response Date", app.response_date ? formatDate(app.response_date) : "—"],
+            ["Last Updated", formatDate(app.updated_date)],
+            ["Notes", app.notes || "—"],
+        ];
+
+        $("#modalBody").innerHTML = fields.map(([label, value]) => `
+            <div class="modal-detail">
+                <span class="modal-detail-label">${label}</span>
+                <span class="modal-detail-value">${value}</span>
+            </div>`).join("");
+
+        $("#modalOverlay").classList.add("active");
+    } catch (e) {
+        showToast("Failed to load details", "error");
+    }
+}
+
+function closeModal() {
+    $("#modalOverlay").classList.remove("active");
+}
+
+// ========== HELPERS ==========
+function esc(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return "—";
+    try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    } catch {
+        return dateStr;
+    }
+}
+
+function statusBadge(status) {
+    const cls = status.toLowerCase().replace(/\s+/g, "-");
+    return `<span class="status-badge status-${cls}">${status}</span>`;
+}
+
+function platformBadge(platform) {
+    const icons = {
+        LinkedIn: "fab fa-linkedin", Naukri: "fas fa-briefcase", Glassdoor: "fas fa-door-open",
+        Indeed: "fas fa-search", AngelList: "fas fa-rocket", Wellfound: "fas fa-rocket",
+        Instahyre: "fas fa-user-check", Internshala: "fas fa-graduation-cap",
+        Monster: "fas fa-dragon", CareerBuilder: "fas fa-hard-hat", ZipRecruiter: "fas fa-bolt",
+        Hired: "fas fa-handshake", "Company Website": "fas fa-globe", Referral: "fas fa-user-friends",
+        Other: "fas fa-ellipsis-h",
+    };
+    const icon = icons[platform] || "fas fa-briefcase";
+    return `<span class="platform-badge"><i class="${icon}"></i> ${platform}</span>`;
+}
+
+// ========== TOAST ==========
+function showToast(message, type = "info") {
+    const icons = { success: "fa-check-circle", error: "fa-exclamation-circle", info: "fa-info-circle" };
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<i class="fas ${icons[type]}"></i><span>${message}</span>`;
+    $("#toastContainer").appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(40px)";
+        toast.style.transition = "all 0.3s ease";
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
+// ==========================================
+//  AUTO-SCAN ON LOGIN
+// ==========================================
+
+async function triggerAutoScanIfConnected() {
+    try {
+        const res = await authFetch(`${API}/gmail/status`);
+        const data = await res.json();
+        if (data.is_authenticated) {
+            // Trigger a background scan via signin already did it,
+            // but if page was refreshed, we check status
+            pollScanStatus();
+        }
+    } catch (e) {
+        // Silently ignore
+    }
+}
+
+async function pollScanStatus() {
+    let attempts = 0;
+    const maxAttempts = 60; // poll for up to ~2 minutes
+
+    const poll = async () => {
+        try {
+            const res = await authFetch(`${API}/scan/status`);
+            const data = await res.json();
+
+            if (data.status === "scanning") {
+                attempts++;
+                if (attempts < maxAttempts) {
+                    setTimeout(poll, 2000);
+                }
+            } else if (data.status === "done" && data.result) {
+                const r = data.result;
+                if (r.imported > 0 || r.updated > 0) {
+                    showToast(`✅ Auto-scan: ${r.imported} new, ${r.updated || 0} updated applications imported!`, "success");
+                    await refreshData();  // Refresh dashboard with new data
+                } else if (r.found > 0) {
+                    showToast("Auto-scan complete — all applications already up to date.", "info");
+                }
+                // else: no Gmail accounts, stay silent
+            } else if (data.status === "error") {
+                console.error("Auto-scan error:", data.result?.error);
+                // Don't show error toast — don't alarm the user on auto-scan
+            }
+            // status === "idle" means no scan was triggered, do nothing
+        } catch (e) {
+            // Silently ignore network errors during polling
+        }
+    };
+
+    // Start polling after a short delay
+    setTimeout(poll, 3000);
+}
+
+// ==========================================
+//  GMAIL INTEGRATION (Multi-Account)
+// ==========================================
+
+async function checkGmailStatus() {
+    try {
+        const res = await authFetch(`${API}/gmail/accounts`);
+        const data = await res.json();
+        const accounts = data.accounts || [];
+
+        renderAccountsList(accounts);
+
+        if (accounts.length > 0) {
+            $("#gmailScanCard").style.display = "block";
+            $("#scanGmailBtn").innerHTML = '<i class="fas fa-envelope"></i> Scan Gmail';
+        } else {
+            $("#gmailScanCard").style.display = "none";
+        }
+    } catch (e) {
+        console.error("Gmail status check failed:", e);
+    }
+}
+
+function renderAccountsList(accounts) {
+    const container = $("#connectedAccountsList");
+    if (!container) return;
+
+    if (!accounts.length) {
+        container.innerHTML = `
+            <p class="no-accounts-msg">
+                <i class="fas fa-info-circle"></i> No Gmail accounts connected yet. Click <strong>"Add Account"</strong> to get started.
+            </p>`;
+        return;
+    }
+
+    container.innerHTML = accounts.map(acct => {
+        const initials = acct.email.charAt(0).toUpperCase();
+        return `
+            <div class="account-row" data-id="${acct.id}">
+                <div class="account-info">
+                    <div class="account-icon">${esc(initials)}</div>
+                    <span class="account-email">${esc(acct.email)}</span>
+                    <span class="account-badge"><i class="fas fa-check"></i> Connected</span>
+                </div>
+                <button class="account-remove-btn" data-id="${acct.id}" title="Remove account">
+                    <i class="fas fa-trash-alt"></i> Remove
+                </button>
+            </div>`;
+    }).join("");
+
+    container.querySelectorAll(".account-remove-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const row = btn.closest(".account-row");
+            const email = row.querySelector(".account-email").textContent;
+            if (!confirm(`Remove ${email}?`)) return;
+
+            try {
+                const res = await authFetch(`${API}/gmail/accounts/${id}`, { method: "DELETE" });
+                if (res.ok) {
+                    showToast(`${email} removed.`, "info");
+                    await checkGmailStatus();
+                } else {
+                    const data = await res.json();
+                    showToast(data.error || "Failed to remove", "error");
+                }
+            } catch (e) {
+                showToast("Failed to remove account.", "error");
+            }
+        });
+    });
+}
+
+function setupGmailForm() {
+    const setupCard = $("#gmailSetupCard");
+    if (!setupCard) return;
+
+    $("#showAddAccountBtn")?.addEventListener("click", () => {
+        setupCard.style.display = "block";
+        $("#gmailEmail").value = "";
+        $("#gmailAppPassword").value = "";
+        $("#gmailEmail").focus();
+    });
+
+    $("#cancelAddAccountBtn")?.addEventListener("click", () => {
+        setupCard.style.display = "none";
+    });
+
+    $("#gmailConnectForm")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const emailAddr = $("#gmailEmail").value.trim();
+        const appPassword = $("#gmailAppPassword").value.trim().replace(/\s/g, "");
+        const btn = $("#connectGmailBtn");
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+
+        try {
+            const res = await authFetch(`${API}/gmail/accounts`, {
+                method: "POST",
+                body: JSON.stringify({ email: emailAddr, app_password: appPassword }),
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast(data.message || "Account connected! 🎉", "success");
+                setupCard.style.display = "none";
+                await checkGmailStatus();
+            } else {
+                showToast(data.error || "Failed to connect", "error");
+            }
+        } catch (e) {
+            showToast("Connection failed. Is the backend running?", "error");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fab fa-google"></i> Connect Account';
+        }
+    });
+}
+
+async function startGmailScan() {
+    const btn = $("#startScanBtn");
+    const progress = $("#scanProgress");
+    const results = $("#scanResults");
+    const daysBack = $("#scanDaysBack").value;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning...';
+    progress.style.display = "block";
+    results.style.display = "none";
+
+    const fill = $("#progressFill");
+    fill.style.width = "10%";
+    setTimeout(() => fill.style.width = "30%", 500);
+    setTimeout(() => fill.style.width = "60%", 1500);
+    setTimeout(() => fill.style.width = "80%", 3000);
+
+    try {
+        const res = await authFetch(`${API}/gmail/scan`, {
+            method: "POST",
+            body: JSON.stringify({ days_back: parseInt(daysBack), max_results: 100 }),
+        });
+
+        const data = await res.json();
+
+        fill.style.width = "100%";
+        $("#scanProgressText").textContent = "Scan complete!";
+
+        setTimeout(() => {
+            progress.style.display = "none";
+
+            if (res.ok) {
+                results.style.display = "block";
+                $("#resultFound").textContent = data.found;
+                $("#resultImported").textContent = data.imported;
+                $("#resultUpdated").textContent = data.updated || 0;
+                $("#resultSkipped").textContent = data.skipped;
+
+                const tbody = $("#scanResultsTable tbody");
+                if (data.applications && data.applications.length > 0) {
+                    tbody.innerHTML = data.applications.map(app => {
+                        const action = app._action === "updated" ? '<span style="color:#f59e0b">↻ Updated</span>' : '<span style="color:#10b981">✓ New</span>';
+                        return `
+                            <tr>
+                                <td class="company-cell">${esc(app.company)}</td>
+                                <td>${esc(app.role)}</td>
+                                <td>${platformBadge(app.platform)}</td>
+                                <td>${statusBadge(app.status)} ${action}</td>
+                                <td>${formatDate(app.applied_date)}</td>
+                            </tr>`;
+                    }).join("");
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">
+                        ${data.found === 0 ? "No job application emails found in this period." : "All found applications were already imported."}
+                    </td></tr>`;
+                }
+
+                showToast(data.message, (data.imported > 0 || data.updated > 0) ? "success" : "info");
+
+                if (data.imported > 0 || data.updated > 0) {
+                    refreshData();
+                }
+            } else {
+                showToast(data.error || "Scan failed", "error");
+            }
+        }, 600);
+
+    } catch (e) {
+        showToast("Scan failed. Is the backend running?", "error");
+        progress.style.display = "none";
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search"></i> Scan All Accounts';
+    }
+}

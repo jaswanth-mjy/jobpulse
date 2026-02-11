@@ -1,0 +1,815 @@
+"""
+JobPulse — Backend API (MongoDB Atlas + JWT Auth)
+"""
+
+from flask import Flask, request, jsonify, g, send_from_directory
+from flask_cors import CORS
+from database import get_db, init_db
+from datetime import datetime, date, timedelta
+from bson import ObjectId
+from functools import wraps
+import traceback
+import bcrypt
+import jwt
+import os
+import threading
+from cryptography.fernet import Fernet
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+# Resolve frontend folder (sibling of backend/)
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
+
+app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
+CORS(app, supports_credentials=True)
+
+JWT_SECRET = os.environ.get("JWT_SECRET", "jobpulse-secret-change-me-in-production")
+JWT_EXPIRY_HOURS = 72
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+
+# ---- Encryption for sensitive data (Gmail app passwords) ----
+ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY", "")
+if ENCRYPTION_KEY:
+    _fernet = Fernet(ENCRYPTION_KEY.encode())
+else:
+    _fernet = Fernet(Fernet.generate_key())  # fallback — not persistent across restarts
+    print("⚠️  No ENCRYPTION_KEY in .env — generated a temporary one. App passwords won't survive restarts.")
+
+
+def encrypt_value(plaintext: str) -> str:
+    """Encrypt a string and return base64-encoded ciphertext."""
+    return _fernet.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_value(ciphertext: str) -> str:
+    """Decrypt a base64-encoded ciphertext back to plaintext."""
+    return _fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+
+# ---------- PLATFORMS ----------
+PLATFORMS = [
+    "LinkedIn", "Naukri", "Glassdoor", "Indeed", "AngelList",
+    "Wellfound", "Instahyre", "Internshala", "Monster",
+    "CareerBuilder", "ZipRecruiter", "Hired",
+    "Workday", "Greenhouse", "Lever", "iCIMS", "SmartRecruiters",
+    "Taleo", "BrassRing", "SuccessFactors", "Workable", "Ashby",
+    "BambooHR", "Jobvite", "Phenom", "Eightfold",
+    "Company Website", "Referral", "Other"
+]
+
+STATUSES = [
+    "Applied", "Viewed", "In Review", "Assessment", "Phone Screen",
+    "Interview Scheduled", "Interviewed", "Technical Round",
+    "HR Round", "Offer Received", "Accepted", "Rejected", "Withdrawn", "Ghosted"
+]
+
+
+# ============================================================
+#  HELPERS
+# ============================================================
+
+def mongo_to_dict(doc):
+    """Convert a MongoDB document to a JSON-safe dict."""
+    if not doc:
+        return None
+    doc["id"] = str(doc.pop("_id"))
+    if "user_id" in doc:
+        doc["user_id"] = str(doc["user_id"])
+    return doc
+
+
+def require_auth(f):
+    """Decorator — require valid JWT in Authorization header."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+        if not token:
+            return jsonify({"error": "Authentication required"}), 401
+
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            g.user_id = payload["user_id"]
+            g.user_email = payload.get("email", "")
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "Token expired. Please sign in again."}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ============================================================
+#  AUTH ROUTES
+# ============================================================
+
+@app.route("/api/auth/signup", methods=["POST"])
+def signup():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    email_addr = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not name or not email_addr or not password:
+        return jsonify({"error": "Name, email, and password are required"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    db = get_db()
+
+    # Check if user exists
+    if db.users.find_one({"email": email_addr}):
+        return jsonify({"error": "An account with this email already exists"}), 409
+
+    # Hash password
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+    user = {
+        "name": name,
+        "email": email_addr,
+        "password": hashed.decode("utf-8"),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    result = db.users.insert_one(user)
+    user_id = str(result.inserted_id)
+
+    # Generate JWT
+    token = jwt.encode({
+        "user_id": user_id,
+        "email": email_addr,
+        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
+    }, JWT_SECRET, algorithm="HS256")
+
+    return jsonify({
+        "message": "Account created successfully!",
+        "token": token,
+        "user": {"id": user_id, "name": name, "email": email_addr},
+    }), 201
+
+
+@app.route("/api/auth/signin", methods=["POST"])
+def signin():
+    data = request.get_json()
+    email_addr = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not email_addr or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+
+    db = get_db()
+    user = db.users.find_one({"email": email_addr})
+
+    if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password"].encode("utf-8")):
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    user_id = str(user["_id"])
+
+    token = jwt.encode({
+        "user_id": user_id,
+        "email": email_addr,
+        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
+    }, JWT_SECRET, algorithm="HS256")
+
+    # Check if user has Gmail connected → flag for auto-scan
+    gmail_connected = db.gmail_config.count_documents({"user_id": ObjectId(user_id)}) > 0
+
+    # Trigger background scan if Gmail is connected
+    if gmail_connected:
+        _trigger_background_scan(user_id)
+
+    return jsonify({
+        "message": "Signed in successfully!",
+        "token": token,
+        "user": {"id": user_id, "name": user["name"], "email": email_addr},
+        "gmail_connected": gmail_connected,
+        "auto_scan": gmail_connected,
+    })
+
+
+@app.route("/api/auth/google", methods=["POST"])
+def google_auth():
+    """Sign in (or sign up) using Google ID token from Google Identity Services."""
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+
+    data = request.get_json()
+    credential = data.get("credential", "")
+
+    if not credential:
+        return jsonify({"error": "Google credential is required"}), 400
+
+    if not GOOGLE_CLIENT_ID:
+        return jsonify({"error": "Google sign-in is not configured on the server."}), 500
+
+    try:
+        # Verify the Google ID token
+        idinfo = id_token.verify_oauth2_token(
+            credential, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
+
+        google_email = idinfo["email"].lower()
+        google_name = idinfo.get("name", google_email.split("@")[0])
+        google_picture = idinfo.get("picture", "")
+
+        db = get_db()
+        user = db.users.find_one({"email": google_email})
+
+        if user:
+            # Existing user — sign in
+            user_id = str(user["_id"])
+            name = user["name"]
+        else:
+            # New user — create account (no password needed for Google users)
+            new_user = {
+                "name": google_name,
+                "email": google_email,
+                "password": "",  # Google users don't have a local password
+                "auth_provider": "google",
+                "picture": google_picture,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            result = db.users.insert_one(new_user)
+            user_id = str(result.inserted_id)
+            name = google_name
+
+        token = jwt.encode({
+            "user_id": user_id,
+            "email": google_email,
+            "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
+        }, JWT_SECRET, algorithm="HS256")
+
+        # Check Gmail connection + auto-scan
+        gmail_connected = db.gmail_config.count_documents({"user_id": ObjectId(user_id)}) > 0
+        if gmail_connected:
+            _trigger_background_scan(user_id)
+
+        return jsonify({
+            "message": "Signed in with Google!",
+            "token": token,
+            "user": {"id": user_id, "name": name, "email": google_email},
+            "gmail_connected": gmail_connected,
+            "auto_scan": gmail_connected,
+        })
+
+    except ValueError as e:
+        return jsonify({"error": f"Invalid Google token: {str(e)}"}), 401
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Google sign-in failed: {str(e)}"}), 500
+
+
+@app.route("/api/auth/me", methods=["GET"])
+@require_auth
+def auth_me():
+    db = get_db()
+    user = db.users.find_one({"_id": ObjectId(g.user_id)})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "user": {
+            "id": str(user["_id"]),
+            "name": user["name"],
+            "email": user["email"],
+        }
+    })
+
+
+# ============================================================
+#  METADATA
+# ============================================================
+
+@app.route("/api/platforms", methods=["GET"])
+def get_platforms():
+    return jsonify(PLATFORMS)
+
+
+@app.route("/api/statuses", methods=["GET"])
+def get_statuses():
+    return jsonify(STATUSES)
+
+
+# ============================================================
+#  APPLICATIONS — CRUD (all require auth)
+# ============================================================
+
+@app.route("/api/applications", methods=["POST"])
+@require_auth
+def create_application():
+    data = request.get_json()
+
+    required = ["company", "role", "platform"]
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"'{field}' is required"}), 400
+
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    applied = data.get("applied_date", date.today().isoformat())
+
+    doc = {
+        "user_id": ObjectId(g.user_id),
+        "company": data["company"],
+        "role": data["role"],
+        "platform": data["platform"],
+        "status": data.get("status", "Applied"),
+        "salary": data.get("salary", ""),
+        "location": data.get("location", ""),
+        "job_url": data.get("job_url", ""),
+        "notes": data.get("notes", ""),
+        "applied_date": applied,
+        "updated_date": now,
+        "interview_date": data.get("interview_date", ""),
+        "response_date": data.get("response_date", ""),
+    }
+
+    db = get_db()
+    result = db.applications.insert_one(doc)
+    return jsonify({"message": "Application added!", "id": str(result.inserted_id)}), 201
+
+
+@app.route("/api/applications", methods=["GET"])
+@require_auth
+def get_applications():
+    db = get_db()
+
+    platform = request.args.get("platform")
+    status = request.args.get("status")
+    search = request.args.get("search")
+    sort_by = request.args.get("sort_by", "applied_date")
+    order = request.args.get("order", "desc")
+
+    query = {"user_id": ObjectId(g.user_id)}
+
+    if platform:
+        query["platform"] = platform
+    if status:
+        query["status"] = status
+    if search:
+        query["$or"] = [
+            {"company": {"$regex": search, "$options": "i"}},
+            {"role": {"$regex": search, "$options": "i"}},
+            {"location": {"$regex": search, "$options": "i"}},
+        ]
+
+    allowed_sort = ["applied_date", "updated_date", "company", "role", "status", "platform"]
+    if sort_by not in allowed_sort:
+        sort_by = "applied_date"
+    sort_dir = -1 if order.lower() == "desc" else 1
+
+    cursor = db.applications.find(query).sort(sort_by, sort_dir)
+    return jsonify([mongo_to_dict(doc) for doc in cursor])
+
+
+@app.route("/api/applications/<app_id>", methods=["GET"])
+@require_auth
+def get_application(app_id):
+    db = get_db()
+    doc = db.applications.find_one({"_id": ObjectId(app_id), "user_id": ObjectId(g.user_id)})
+    if not doc:
+        return jsonify({"error": "Application not found"}), 404
+    return jsonify(mongo_to_dict(doc))
+
+
+@app.route("/api/applications/<app_id>", methods=["PUT"])
+@require_auth
+def update_application(app_id):
+    data = request.get_json()
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    db = get_db()
+    existing = db.applications.find_one({"_id": ObjectId(app_id), "user_id": ObjectId(g.user_id)})
+    if not existing:
+        return jsonify({"error": "Application not found"}), 404
+
+    update_fields = {"updated_date": now}
+    for field in ["company", "role", "platform", "status", "salary", "location",
+                   "job_url", "notes", "applied_date", "interview_date", "response_date"]:
+        if data.get(field) is not None:
+            update_fields[field] = data[field]
+
+    db.applications.update_one({"_id": ObjectId(app_id)}, {"$set": update_fields})
+    return jsonify({"message": "Application updated!"})
+
+
+@app.route("/api/applications/<app_id>", methods=["DELETE"])
+@require_auth
+def delete_application(app_id):
+    db = get_db()
+    result = db.applications.delete_one({"_id": ObjectId(app_id), "user_id": ObjectId(g.user_id)})
+    if result.deleted_count == 0:
+        return jsonify({"error": "Application not found"}), 404
+    return jsonify({"message": "Application deleted!"})
+
+
+# ============================================================
+#  STATS
+# ============================================================
+
+@app.route("/api/stats", methods=["GET"])
+@require_auth
+def get_stats():
+    db = get_db()
+    user_filter = {"user_id": ObjectId(g.user_id)}
+
+    total = db.applications.count_documents(user_filter)
+
+    # Group by status
+    pipeline_status = [
+        {"$match": user_filter},
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+    ]
+    by_status = {doc["_id"]: doc["count"] for doc in db.applications.aggregate(pipeline_status)}
+
+    # Group by platform
+    pipeline_platform = [
+        {"$match": user_filter},
+        {"$group": {"_id": "$platform", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    by_platform = {doc["_id"]: doc["count"] for doc in db.applications.aggregate(pipeline_platform)}
+
+    # Response rate
+    responded = (
+        by_status.get("Rejected", 0) + by_status.get("Interview Scheduled", 0) +
+        by_status.get("Interviewed", 0) + by_status.get("Offer Received", 0) +
+        by_status.get("Accepted", 0) + by_status.get("Phone Screen", 0) +
+        by_status.get("Technical Round", 0) + by_status.get("HR Round", 0) +
+        by_status.get("Assessment", 0)
+    )
+    response_rate = round((responded / total * 100), 1) if total > 0 else 0
+
+    return jsonify({
+        "total": total,
+        "by_status": by_status,
+        "by_platform": by_platform,
+        "weekly": {},
+        "response_rate": response_rate,
+    })
+
+
+# ============================================================
+#  GMAIL INTEGRATION
+# ============================================================
+
+@app.route("/api/gmail/accounts", methods=["GET"])
+@require_auth
+def gmail_accounts():
+    try:
+        db = get_db()
+        accounts = list(db.gmail_config.find({"user_id": ObjectId(g.user_id)}))
+        result = []
+        for acct in accounts:
+            result.append({
+                "id": str(acct["_id"]),
+                "email": acct["email"],
+            })
+        return jsonify({"accounts": result})
+    except Exception as e:
+        return jsonify({"accounts": [], "error": str(e)})
+
+
+@app.route("/api/gmail/accounts", methods=["POST"])
+@require_auth
+def gmail_add_account():
+    try:
+        from gmail_service import test_connection
+
+        data = request.get_json()
+        email_addr = data.get("email", "").strip()
+        app_password = data.get("app_password", "").strip()
+
+        if not email_addr or not app_password:
+            return jsonify({"error": "Email and App Password are required."}), 400
+
+        success, message = test_connection(email_addr, app_password)
+        if not success:
+            return jsonify({"error": message}), 401
+
+        db = get_db()
+        # Check if already added
+        existing = db.gmail_config.find_one({
+            "user_id": ObjectId(g.user_id),
+            "email": email_addr
+        })
+        if existing:
+            return jsonify({"error": "This Gmail account is already connected."}), 409
+
+        doc = {
+            "user_id": ObjectId(g.user_id),
+            "email": email_addr,
+            "app_password": encrypt_value(app_password),  # encrypted!
+        }
+        db.gmail_config.insert_one(doc)
+        return jsonify({"message": f"{email_addr} connected successfully!", "account": {"email": email_addr}})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gmail/accounts/<account_id>", methods=["DELETE"])
+@require_auth
+def gmail_remove_account(account_id):
+    db = get_db()
+    result = db.gmail_config.delete_one({"_id": ObjectId(account_id), "user_id": ObjectId(g.user_id)})
+    if result.deleted_count == 0:
+        return jsonify({"error": "Account not found."}), 404
+    return jsonify({"message": "Account removed."})
+
+
+@app.route("/api/gmail/status", methods=["GET"])
+@require_auth
+def gmail_status():
+    db = get_db()
+    accounts = list(db.gmail_config.find({"user_id": ObjectId(g.user_id)}))
+    result = [{"id": str(a["_id"]), "email": a["email"]} for a in accounts]
+    return jsonify({
+        "is_authenticated": len(result) > 0,
+        "email": result[0]["email"] if result else "",
+        "accounts": result,
+    })
+
+
+@app.route("/api/gmail/scan", methods=["POST"])
+@require_auth
+def gmail_scan():
+    try:
+        from gmail_service import scan_emails_for_account
+
+        db = get_db()
+        accounts = list(db.gmail_config.find({"user_id": ObjectId(g.user_id)}))
+
+        if not accounts:
+            return jsonify({"error": "No Gmail accounts connected. Please connect first."}), 401
+
+        data = request.get_json() or {}
+        days_back = data.get("days_back", 90)
+        max_results = data.get("max_results", 500)
+
+        all_applications = []
+        for acct in accounts:
+            try:
+                # Decrypt the stored app password
+                raw_password = acct["app_password"]
+                try:
+                    decrypted_pw = decrypt_value(raw_password)
+                except Exception:
+                    decrypted_pw = raw_password  # fallback for legacy unencrypted entries
+
+                apps = scan_emails_for_account(acct["email"], decrypted_pw,
+                                                days_back=days_back, max_results=max_results)
+                all_applications.extend(apps)
+            except Exception as e:
+                print(f"Error scanning {acct['email']}: {e}")
+
+        if not all_applications:
+            return jsonify({
+                "message": "No new job application emails found.",
+                "imported": 0, "found": 0, "skipped": 0, "updated": 0,
+                "applications": []
+            })
+
+        imported = 0
+        skipped = 0
+        updated = 0
+        imported_apps = []
+        user_oid = ObjectId(g.user_id)
+
+        for app_data in all_applications:
+            email_type = app_data.get("email_type", "applied")
+
+            if email_type in ("rejected", "interview", "assessment"):
+                existing = db.applications.find_one(
+                    {"user_id": user_oid, "company": {"$regex": f"^{app_data['company']}$", "$options": "i"}},
+                    sort=[("applied_date", -1)]
+                )
+                if existing:
+                    old_status = existing["status"]
+                    new_status = app_data["status"]
+                    if old_status != new_status:
+                        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                        update_set = {"status": new_status, "updated_date": now}
+                        if email_type == "rejected":
+                            update_set["response_date"] = app_data["applied_date"]
+                        if email_type in ("interview", "assessment"):
+                            update_set["interview_date"] = app_data["applied_date"]
+
+                        db.applications.update_one(
+                            {"_id": existing["_id"]},
+                            {"$set": update_set}
+                        )
+                        updated += 1
+                        app_data["id"] = str(existing["_id"])
+                        app_data["_action"] = "updated"
+                        imported_apps.append(app_data)
+                    else:
+                        skipped += 1
+                else:
+                    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                    new_doc = {
+                        "user_id": user_oid,
+                        "company": app_data["company"],
+                        "role": app_data["role"],
+                        "platform": app_data["platform"],
+                        "status": app_data.get("status", "Applied"),
+                        "salary": app_data.get("salary", ""),
+                        "location": app_data.get("location", ""),
+                        "job_url": app_data.get("job_url", ""),
+                        "notes": app_data.get("notes", ""),
+                        "applied_date": app_data["applied_date"],
+                        "updated_date": now,
+                        "interview_date": app_data["applied_date"] if email_type == "interview" else "",
+                        "response_date": app_data["applied_date"] if email_type == "rejected" else "",
+                    }
+                    result = db.applications.insert_one(new_doc)
+                    imported += 1
+                    app_data["id"] = str(result.inserted_id)
+                    app_data["_action"] = "new"
+                    imported_apps.append(app_data)
+            else:
+                existing = db.applications.find_one({
+                    "user_id": user_oid,
+                    "company": app_data["company"],
+                    "role": app_data["role"],
+                    "applied_date": app_data["applied_date"],
+                })
+                if existing:
+                    skipped += 1
+                    continue
+
+                now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                new_doc = {
+                    "user_id": user_oid,
+                    "company": app_data["company"],
+                    "role": app_data["role"],
+                    "platform": app_data["platform"],
+                    "status": app_data.get("status", "Applied"),
+                    "salary": app_data.get("salary", ""),
+                    "location": app_data.get("location", ""),
+                    "job_url": app_data.get("job_url", ""),
+                    "notes": app_data.get("notes", ""),
+                    "applied_date": app_data["applied_date"],
+                    "updated_date": now,
+                    "interview_date": "",
+                    "response_date": "",
+                }
+                result = db.applications.insert_one(new_doc)
+                imported += 1
+                app_data["id"] = str(result.inserted_id)
+                app_data["_action"] = "new"
+                imported_apps.append(app_data)
+
+        return jsonify({
+            "message": f"Imported {imported} new, updated {updated} existing applications from Gmail!",
+            "imported": imported,
+            "updated": updated,
+            "found": len(all_applications),
+            "skipped": skipped,
+            "applications": imported_apps,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Scan failed: {str(e)}"}), 500
+
+
+# ============================================================
+#  BACKGROUND SCAN
+# ============================================================
+
+_scan_status = {}  # user_id -> {"status": "scanning"/"done"/"error", "result": {...}}
+
+
+def _trigger_background_scan(user_id: str):
+    """Run Gmail scan in a background thread after login."""
+    def _do_scan():
+        try:
+            from gmail_service import scan_emails_for_account
+            _scan_status[user_id] = {"status": "scanning", "result": None}
+
+            db = get_db()
+            accounts = list(db.gmail_config.find({"user_id": ObjectId(user_id)}))
+            if not accounts:
+                _scan_status[user_id] = {"status": "done", "result": {"imported": 0, "message": "No Gmail accounts"}}
+                return
+
+            all_applications = []
+            for acct in accounts:
+                try:
+                    raw_pw = acct["app_password"]
+                    try:
+                        pw = decrypt_value(raw_pw)
+                    except Exception:
+                        pw = raw_pw
+                    apps = scan_emails_for_account(acct["email"], pw, days_back=30, max_results=200)
+                    all_applications.extend(apps)
+                except Exception as e:
+                    print(f"Background scan error for {acct['email']}: {e}")
+
+            # Import results
+            imported = 0
+            updated = 0
+            user_oid = ObjectId(user_id)
+            for app_data in all_applications:
+                email_type = app_data.get("email_type", "applied")
+                if email_type in ("rejected", "interview", "assessment"):
+                    existing = db.applications.find_one(
+                        {"user_id": user_oid, "company": {"$regex": f"^{app_data['company']}$", "$options": "i"}},
+                        sort=[("applied_date", -1)]
+                    )
+                    if existing:
+                        old_status = existing["status"]
+                        new_status = app_data["status"]
+                        if old_status != new_status:
+                            now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                            update_set = {"status": new_status, "updated_date": now}
+                            if email_type == "rejected":
+                                update_set["response_date"] = app_data["applied_date"]
+                            if email_type in ("interview", "assessment"):
+                                update_set["interview_date"] = app_data["applied_date"]
+                            db.applications.update_one({"_id": existing["_id"]}, {"$set": update_set})
+                            updated += 1
+                    else:
+                        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                        db.applications.insert_one({
+                            "user_id": user_oid,
+                            "company": app_data["company"], "role": app_data["role"],
+                            "platform": app_data["platform"], "status": app_data.get("status", "Applied"),
+                            "salary": "", "location": app_data.get("location", ""),
+                            "job_url": "", "notes": "",
+                            "applied_date": app_data["applied_date"], "updated_date": now,
+                            "interview_date": app_data["applied_date"] if email_type == "interview" else "",
+                            "response_date": app_data["applied_date"] if email_type == "rejected" else "",
+                        })
+                        imported += 1
+                else:
+                    existing = db.applications.find_one({
+                        "user_id": user_oid,
+                        "company": app_data["company"],
+                        "role": app_data["role"],
+                        "applied_date": app_data["applied_date"],
+                    })
+                    if not existing:
+                        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                        db.applications.insert_one({
+                            "user_id": user_oid,
+                            "company": app_data["company"], "role": app_data["role"],
+                            "platform": app_data["platform"], "status": app_data.get("status", "Applied"),
+                            "salary": "", "location": app_data.get("location", ""),
+                            "job_url": "", "notes": "",
+                            "applied_date": app_data["applied_date"], "updated_date": now,
+                            "interview_date": "", "response_date": "",
+                        })
+                        imported += 1
+
+            _scan_status[user_id] = {
+                "status": "done",
+                "result": {"imported": imported, "updated": updated, "found": len(all_applications)}
+            }
+            print(f"✅ Background scan done for user {user_id}: {imported} imported, {updated} updated")
+
+        except Exception as e:
+            print(f"❌ Background scan error: {e}")
+            _scan_status[user_id] = {"status": "error", "result": {"error": str(e)}}
+
+    thread = threading.Thread(target=_do_scan, daemon=True)
+    thread.start()
+
+
+@app.route("/api/scan/status", methods=["GET"])
+@require_auth
+def scan_status():
+    """Check the status of a background scan triggered on login."""
+    status = _scan_status.get(g.user_id, {"status": "idle", "result": None})
+    return jsonify(status)
+
+
+# ============================================================
+#  SERVE FRONTEND
+# ============================================================
+
+@app.route("/")
+def serve_index():
+    return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/<path:path>")
+def serve_static(path):
+    """Serve frontend static files; fall back to index.html for SPA routes."""
+    file_path = os.path.join(FRONTEND_DIR, path)
+    if os.path.isfile(file_path):
+        return send_from_directory(FRONTEND_DIR, path)
+    return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+# ============================================================
+#  START
+# ============================================================
+
+if __name__ == "__main__":
+    init_db()
+    port = int(os.environ.get("PORT", 5050))
+    print(f"🚀 JobPulse API running on http://localhost:{port}")
+    app.run(debug=True, host="0.0.0.0", port=port, use_reloader=False)

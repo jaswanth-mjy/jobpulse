@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPulse — Smart Job Application Tracker</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+    <!-- ========================================================
+         LANDING PAGE (visible when not logged in)
+         ======================================================== -->
+    <div id="landingPage" class="landing-page">
+
+        <!-- ===== NAVBAR ===== -->
+        <nav class="landing-nav">
+            <div class="landing-nav-inner">
+                <a href="#" class="landing-logo">
+                    <i class="fas fa-briefcase"></i>
+                    <span>JobPulse</span>
+                </a>
+                <div class="landing-nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#how-it-works">How It Works</a>
+                    <a href="#testimonials">Why JobPulse</a>
+                    <button class="btn btn-ghost-light" onclick="showAuth('signin')">Sign In</button>
+                    <button class="btn btn-primary" onclick="showAuth('signup')">Get Started Free</button>
+                </div>
+                <button class="landing-menu-btn" id="landingMenuBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            <!-- Mobile menu -->
+            <div class="landing-mobile-menu" id="landingMobileMenu">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#testimonials">Why JobPulse</a>
+                <button class="btn btn-ghost-light" onclick="showAuth('signin')">Sign In</button>
+                <button class="btn btn-primary" onclick="showAuth('signup')">Get Started Free</button>
+            </div>
+        </nav>
+
+        <!-- ===== HERO ===== -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <i class="fas fa-rocket"></i> Track Every Application. Land More Interviews.
+                </div>
+                <h1 class="hero-title">
+                    Your Job Search,<br>
+                    <span class="gradient-text">Organized & Automated</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Stop losing track of applications in spreadsheets. JobPulse automatically imports your
+                    applications from Gmail, tracks every status change, and gives you powerful insights
+                    into your job search journey.
+                </p>
+                <div class="hero-cta">
+                    <button class="btn btn-primary btn-xl" onclick="showAuth('signup')">
+                        <i class="fas fa-rocket"></i> Start Tracking Free
+                    </button>
+                    <button class="btn btn-ghost-light btn-xl" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
+                        <i class="fas fa-play-circle"></i> See Features
+                    </button>
+                </div>
+                <div class="hero-stats-row">
+                    <div class="hero-stat">
+                        <span class="hero-stat-number">30+</span>
+                        <span class="hero-stat-label">Platforms Tracked</span>
+                    </div>
+                    <div class="hero-stat-divider"></div>
+                    <div class="hero-stat">
+                        <span class="hero-stat-number">Auto</span>
+                        <span class="hero-stat-label">Gmail Import</span>
+                    </div>
+                    <div class="hero-stat-divider"></div>
+                    <div class="hero-stat">
+                        <span class="hero-stat-number">100%</span>
+                        <span class="hero-stat-label">Free Forever</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-mockup">
+                    <div class="mockup-bar">
+                        <span class="mockup-dot red"></span>
+                        <span class="mockup-dot yellow"></span>
+                        <span class="mockup-dot green"></span>
+                        <span class="mockup-title">JobPulse Dashboard</span>
+                    </div>
+                    <div class="mockup-body">
+                        <div class="mockup-stats">
+                            <div class="m-stat"><span>47</span><small>Applied</small></div>
+                            <div class="m-stat purple"><span>8</span><small>Interviews</small></div>
+                            <div class="m-stat green"><span>3</span><small>Offers</small></div>
+                            <div class="m-stat red"><span>12</span><small>Rejected</small></div>
+                        </div>
+                        <div class="mockup-rows">
+                            <div class="m-row"><span class="m-company">Google</span><span class="m-role">SDE II</span><span class="m-badge m-blue">Applied</span></div>
+                            <div class="m-row"><span class="m-company">Amazon</span><span class="m-role">Frontend Dev</span><span class="m-badge m-purple">Interview</span></div>
+                            <div class="m-row"><span class="m-company">Microsoft</span><span class="m-role">Cloud Engineer</span><span class="m-badge m-green">Offer</span></div>
+                            <div class="m-row"><span class="m-company">Meta</span><span class="m-role">ML Engineer</span><span class="m-badge m-yellow">Assessment</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== FEATURES ===== -->
+        <section class="features-section" id="features">
+            <div class="section-container">
+                <div class="section-header">
+                    <span class="section-badge"><i class="fas fa-star"></i> Features</span>
+                    <h2>Everything You Need to <span class="gradient-text">Win Your Job Search</span></h2>
+                    <p>Powerful tools to organize, track, and optimize your applications</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon blue">
+                            <i class="fas fa-envelope-open-text"></i>
+                        </div>
+                        <h3>Auto Gmail Import</h3>
+                        <p>Connect your Gmail and automatically import job applications from LinkedIn, Naukri, Indeed, Glassdoor, and 25+ platforms.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon purple">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <h3>Visual Dashboard</h3>
+                        <p>Beautiful charts and stats showing your application pipeline, response rates, platform breakdown, and weekly trends.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon green">
+                            <i class="fas fa-sync-alt"></i>
+                        </div>
+                        <h3>Status Tracking</h3>
+                        <p>Track every stage — Applied, Interview, Assessment, Offer, Rejected. Automatic status updates from email notifications.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon orange">
+                            <i class="fas fa-filter"></i>
+                        </div>
+                        <h3>Smart Filters</h3>
+                        <p>Filter by platform, status, date. Search by company or role. Sort by any column to find what you need instantly.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon pink">
+                            <i class="fas fa-cloud"></i>
+                        </div>
+                        <h3>Cloud Synced</h3>
+                        <p>Your data is securely stored in the cloud with MongoDB Atlas. Access from anywhere, never lose your data.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon red">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <h3>Secure & Private</h3>
+                        <p>Password hashing with bcrypt, JWT authentication, and user-scoped data. Your applications are only visible to you.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== HOW IT WORKS ===== -->
+        <section class="how-section" id="how-it-works">
+            <div class="section-container">
+                <div class="section-header">
+                    <span class="section-badge"><i class="fas fa-magic"></i> How It Works</span>
+                    <h2>Get Started in <span class="gradient-text">3 Simple Steps</span></h2>
+                    <p>From signup to tracking — it takes less than 2 minutes</p>
+                </div>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <div class="step-icon"><i class="fas fa-user-plus"></i></div>
+                        <h3>Create Account</h3>
+                        <p>Sign up with your email in seconds. No credit card required, free forever.</p>
+                    </div>
+                    <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <div class="step-icon"><i class="fas fa-link"></i></div>
+                        <h3>Connect Gmail</h3>
+                        <p>Link your Gmail using an App Password. We'll auto-detect job application emails.</p>
+                    </div>
+                    <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <div class="step-icon"><i class="fas fa-chart-line"></i></div>
+                        <h3>Track & Win</h3>
+                        <p>Watch your dashboard fill up. Get insights, track interviews, and land your dream job!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PLATFORMS ===== -->
+        <section class="platforms-section">
+            <div class="section-container">
+                <div class="section-header">
+                    <span class="section-badge"><i class="fas fa-globe"></i> Supported Platforms</span>
+                    <h2>Works with <span class="gradient-text">All Major Platforms</span></h2>
+                </div>
+                <div class="platforms-ticker">
+                    <div class="platform-tag"><i class="fab fa-linkedin"></i> LinkedIn</div>
+                    <div class="platform-tag"><i class="fas fa-briefcase"></i> Naukri</div>
+                    <div class="platform-tag"><i class="fas fa-door-open"></i> Glassdoor</div>
+                    <div class="platform-tag"><i class="fas fa-search"></i> Indeed</div>
+                    <div class="platform-tag"><i class="fas fa-rocket"></i> Wellfound</div>
+                    <div class="platform-tag"><i class="fas fa-user-check"></i> Instahyre</div>
+                    <div class="platform-tag"><i class="fas fa-graduation-cap"></i> Internshala</div>
+                    <div class="platform-tag"><i class="fas fa-cog"></i> Workday</div>
+                    <div class="platform-tag"><i class="fas fa-leaf"></i> Greenhouse</div>
+                    <div class="platform-tag"><i class="fas fa-bolt"></i> Lever</div>
+                    <div class="platform-tag"><i class="fas fa-building"></i> iCIMS</div>
+                    <div class="platform-tag"><i class="fas fa-users"></i> SmartRecruiters</div>
+                    <div class="platform-tag"><i class="fas fa-dragon"></i> Monster</div>
+                    <div class="platform-tag"><i class="fas fa-bolt"></i> ZipRecruiter</div>
+                    <div class="platform-tag"><i class="fas fa-globe"></i> Company Websites</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== TESTIMONIALS / WHY ===== -->
+        <section class="testimonials-section" id="testimonials">
+            <div class="section-container">
+                <div class="section-header">
+                    <span class="section-badge"><i class="fas fa-heart"></i> Why JobPulse</span>
+                    <h2>Built for <span class="gradient-text">Serious Job Seekers</span></h2>
+                </div>
+                <div class="why-grid">
+                    <div class="why-card">
+                        <div class="why-icon">📊</div>
+                        <h3>No More Spreadsheets</h3>
+                        <p>Replace messy Google Sheets with a purpose-built tracker that auto-imports and organizes everything.</p>
+                    </div>
+                    <div class="why-card">
+                        <div class="why-icon">⚡</div>
+                        <h3>Save Hours Every Week</h3>
+                        <p>Auto-import eliminates manual data entry. Focus on preparing for interviews, not updating trackers.</p>
+                    </div>
+                    <div class="why-card">
+                        <div class="why-icon">🎯</div>
+                        <h3>Data-Driven Strategy</h3>
+                        <p>See which platforms give the best response rates. Optimize your job search strategy with real data.</p>
+                    </div>
+                    <div class="why-card">
+                        <div class="why-icon">🔒</div>
+                        <h3>Privacy First</h3>
+                        <p>Your data is encrypted and only accessible by you. We never share or sell your information.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CTA ===== -->
+        <section class="cta-section">
+            <div class="section-container">
+                <div class="cta-content">
+                    <h2>Ready to Take Control of Your Job Search?</h2>
+                    <p>Join thousands of job seekers who track smarter, not harder.</p>
+                    <button class="btn btn-primary btn-xl" onclick="showAuth('signup')">
+                        <i class="fas fa-rocket"></i> Create Free Account
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== FOOTER ===== -->
+        <footer class="landing-footer">
+            <div class="section-container">
+                <div class="footer-inner">
+                    <div class="footer-brand">
+                        <i class="fas fa-briefcase"></i> JobPulse
+                    </div>
+                    <p>Built with ❤️ for job seekers everywhere</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ========================================================
+         AUTH MODAL (Sign In / Sign Up)
+         ======================================================== -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-modal">
+            <button class="auth-close" onclick="hideAuth()"><i class="fas fa-times"></i></button>
+
+            <!-- SIGN IN -->
+            <div class="auth-form-container" id="signinForm">
+                <div class="auth-header">
+                    <i class="fas fa-briefcase auth-logo-icon"></i>
+                    <h2>Welcome Back</h2>
+                    <p>Sign in to your JobPulse account</p>
+                </div>
+                <form onsubmit="handleSignIn(event)">
+                    <div class="auth-field">
+                        <label><i class="fas fa-envelope"></i> Email</label>
+                        <input type="email" id="signinEmail" required placeholder="you@example.com">
+                    </div>
+                    <div class="auth-field">
+                        <label><i class="fas fa-lock"></i> Password</label>
+                        <input type="password" id="signinPassword" required placeholder="••••••••" minlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-primary auth-submit" id="signinBtn">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </button>
+                </form>
+
+                <div class="auth-divider"><span>or</span></div>
+
+                <button class="google-signin-btn" id="googleSigninBtn" onclick="triggerGoogleSignIn()">
+                    <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    Continue with Google
+                </button>
+
+                <p class="auth-switch">
+                    Don't have an account? <a href="#" onclick="showAuth('signup')">Create one</a>
+                </p>
+            </div>
+
+            <!-- SIGN UP -->
+            <div class="auth-form-container" id="signupForm" style="display:none;">
+                <div class="auth-header">
+                    <i class="fas fa-briefcase auth-logo-icon"></i>
+                    <h2>Create Account</h2>
+                    <p>Start tracking your applications for free</p>
+                </div>
+                <form onsubmit="handleSignUp(event)">
+                    <div class="auth-field">
+                        <label><i class="fas fa-user"></i> Full Name</label>
+                        <input type="text" id="signupName" required placeholder="John Doe">
+                    </div>
+                    <div class="auth-field">
+                        <label><i class="fas fa-envelope"></i> Email</label>
+                        <input type="email" id="signupEmail" required placeholder="you@example.com">
+                    </div>
+                    <div class="auth-field">
+                        <label><i class="fas fa-lock"></i> Password</label>
+                        <input type="password" id="signupPassword" required placeholder="Min 6 characters" minlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-primary auth-submit" id="signupBtn">
+                        <i class="fas fa-user-plus"></i> Create Account
+                    </button>
+                </form>
+
+                <div class="auth-divider"><span>or</span></div>
+
+                <button class="google-signin-btn" id="googleSignupBtn" onclick="triggerGoogleSignIn()">
+                    <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    Sign up with Google
+                </button>
+
+                <p class="auth-switch">
+                    Already have an account? <a href="#" onclick="showAuth('signin')">Sign in</a>
+                </p>
+            </div>
+
+            <div class="auth-error" id="authError" style="display:none;"></div>
+        </div>
+    </div>
+
+
+    <!-- ========================================================
+         APP (Dashboard — visible after login)
+         ======================================================== -->
+    <div id="appContainer" style="display:none;">
+
+        <!-- ========== SIDEBAR ========== -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i class="fas fa-briefcase"></i>
+                <span>JobPulse</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <i class="fas fa-chart-pie"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-view="applications">
+                    <i class="fas fa-list-ul"></i> Applications
+                </a>
+                <a href="#" class="nav-item" data-view="add">
+                    <i class="fas fa-plus-circle"></i> Add New
+                </a>
+                <a href="#" class="nav-item" data-view="gmail">
+                    <i class="fas fa-envelope"></i> Gmail Import
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info" id="userInfo">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="userName">User</span>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="logoutBtn" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- ========== MAIN CONTENT ========== -->
+        <main class="main-content">
+
+            <!-- ===== TOP BAR ===== -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+                    <h1 id="pageTitle">Dashboard</h1>
+                </div>
+                <div class="top-bar-right">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="globalSearch" placeholder="Search company, role, location...">
+                    </div>
+                    <button class="btn btn-primary" id="quickAddBtn">
+                        <i class="fas fa-plus"></i> Add Application
+                    </button>
+                    <button class="btn btn-gmail" id="scanGmailBtn">
+                        <i class="fas fa-envelope"></i> Scan Gmail
+                    </button>
+                </div>
+            </header>
+
+            <!-- ===== DASHBOARD VIEW ===== -->
+            <section id="dashboardView" class="view active">
+                <div class="stats-grid">
+                    <div class="stat-card stat-total">
+                        <div class="stat-icon"><i class="fas fa-paper-plane"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statTotal">0</h3>
+                            <p>Total Applied</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-interview">
+                        <div class="stat-icon"><i class="fas fa-user-tie"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statInterviews">0</h3>
+                            <p>Interviews</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-offer">
+                        <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statOffers">0</h3>
+                            <p>Offers</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-rejected">
+                        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statRejected">0</h3>
+                            <p>Rejected</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-response">
+                        <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statResponseRate">0%</h3>
+                            <p>Response Rate</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-ghosted">
+                        <div class="stat-icon"><i class="fas fa-ghost"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statGhosted">0</h3>
+                            <p>Ghosted</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <h3><i class="fas fa-chart-bar"></i> Applications by Platform</h3>
+                        <div class="chart-container" id="platformChart"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3><i class="fas fa-chart-pie"></i> Status Breakdown</h3>
+                        <div class="chart-container" id="statusChart"></div>
+                    </div>
+                </div>
+
+                <div class="recent-section">
+                    <h3><i class="fas fa-clock"></i> Recent Applications</h3>
+                    <div class="table-wrapper">
+                        <table class="app-table" id="recentTable">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Role</th>
+                                    <th>Platform</th>
+                                    <th>Status</th>
+                                    <th>Applied</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== APPLICATIONS VIEW ===== -->
+            <section id="applicationsView" class="view">
+                <div class="filters-bar">
+                    <select id="filterPlatform" class="filter-select">
+                        <option value="">All Platforms</option>
+                    </select>
+                    <select id="filterStatus" class="filter-select">
+                        <option value="">All Statuses</option>
+                    </select>
+                    <select id="sortBy" class="filter-select">
+                        <option value="applied_date">Sort by Date</option>
+                        <option value="company">Sort by Company</option>
+                        <option value="status">Sort by Status</option>
+                        <option value="platform">Sort by Platform</option>
+                    </select>
+                    <select id="sortOrder" class="filter-select">
+                        <option value="desc">Newest First</option>
+                        <option value="asc">Oldest First</option>
+                    </select>
+                </div>
+                <div class="table-wrapper">
+                    <table class="app-table" id="applicationsTable">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Role</th>
+                                <th>Platform</th>
+                                <th>Status</th>
+                                <th>Location</th>
+                                <th>Salary</th>
+                                <th>Applied</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="emptyState" style="display:none;">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No applications yet</h3>
+                    <p>Start tracking your job applications by clicking "Add Application"</p>
+                </div>
+            </section>
+
+            <!-- ===== ADD / EDIT VIEW ===== -->
+            <section id="addView" class="view">
+                <div class="form-card">
+                    <h2 id="formTitle"><i class="fas fa-plus-circle"></i> Add New Application</h2>
+                    <form id="applicationForm">
+                        <input type="hidden" id="editId">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="company"><i class="fas fa-building"></i> Company *</label>
+                                <input type="text" id="company" required placeholder="e.g. Google, Amazon...">
+                            </div>
+                            <div class="form-group">
+                                <label for="role"><i class="fas fa-user-tag"></i> Role / Position *</label>
+                                <input type="text" id="role" required placeholder="e.g. Frontend Developer">
+                            </div>
+                            <div class="form-group">
+                                <label for="platform"><i class="fas fa-globe"></i> Platform *</label>
+                                <select id="platform" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="status"><i class="fas fa-flag"></i> Status</label>
+                                <select id="status"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="salary"><i class="fas fa-money-bill-wave"></i> Salary / CTC</label>
+                                <input type="text" id="salary" placeholder="e.g. ₹12 LPA or $120k">
+                            </div>
+                            <div class="form-group">
+                                <label for="location"><i class="fas fa-map-marker-alt"></i> Location</label>
+                                <input type="text" id="location" placeholder="e.g. Bangalore, Remote">
+                            </div>
+                            <div class="form-group">
+                                <label for="jobUrl"><i class="fas fa-link"></i> Job URL</label>
+                                <input type="url" id="jobUrl" placeholder="https://...">
+                            </div>
+                            <div class="form-group">
+                                <label for="appliedDate"><i class="fas fa-calendar"></i> Applied Date</label>
+                                <input type="date" id="appliedDate">
+                            </div>
+                            <div class="form-group">
+                                <label for="interviewDate"><i class="fas fa-calendar-check"></i> Interview Date</label>
+                                <input type="date" id="interviewDate">
+                            </div>
+                            <div class="form-group">
+                                <label for="responseDate"><i class="fas fa-calendar-day"></i> Response Date</label>
+                                <input type="date" id="responseDate">
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="notes"><i class="fas fa-sticky-note"></i> Notes</label>
+                            <textarea id="notes" rows="3" placeholder="Any additional notes..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="fas fa-save"></i> Save Application
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="cancelBtn">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ===== GMAIL IMPORT VIEW ===== -->
+            <section id="gmailView" class="view">
+                <div class="gmail-section">
+                    <div class="gmail-card" id="gmailAccountsCard">
+                        <div class="gmail-card-header">
+                            <h2><i class="fas fa-envelope"></i> Gmail Accounts</h2>
+                            <button class="btn btn-primary btn-sm" id="showAddAccountBtn">
+                                <i class="fas fa-plus"></i> Add Account
+                            </button>
+                        </div>
+                        <div class="gmail-card-body">
+                            <p class="gmail-description">
+                                Automatically import job applications from your Gmail! We scan confirmation emails from
+                                <strong>LinkedIn, Naukri, Indeed, Glassdoor, Wellfound, Instahyre, Internshala</strong>, and more.
+                            </p>
+                            <div id="connectedAccountsList" class="connected-accounts-list"></div>
+                        </div>
+                    </div>
+
+                    <div class="gmail-card setup-card" id="gmailSetupCard" style="display:none;">
+                        <div class="gmail-card-header">
+                            <h2><i class="fas fa-plus-circle"></i> Add Gmail Account</h2>
+                            <button class="btn btn-ghost btn-sm" id="cancelAddAccountBtn">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                        <div class="gmail-card-body">
+                            <div class="setup-steps">
+                                <h3><i class="fas fa-key"></i> How to get an App Password (30 seconds)</h3>
+                                <ol>
+                                    <li>Go to <a href="https://myaccount.google.com/security" target="_blank">Google Account → Security</a></li>
+                                    <li>Make sure <strong>2-Step Verification</strong> is turned ON</li>
+                                    <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank">App Passwords</a></li>
+                                    <li>Select app: <strong>"Mail"</strong>, Select device: <strong>"Other"</strong> → type <strong>"JobPulse"</strong></li>
+                                    <li>Click <strong>Generate</strong> → Copy the 16-character password</li>
+                                    <li>Paste it below and click <strong>Connect</strong>!</li>
+                                </ol>
+                            </div>
+                            <form id="gmailConnectForm" class="gmail-login-form">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="gmailEmail"><i class="fas fa-at"></i> Gmail Address</label>
+                                        <input type="email" id="gmailEmail" required placeholder="yourname@gmail.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="gmailAppPassword"><i class="fas fa-key"></i> App Password</label>
+                                        <input type="password" id="gmailAppPassword" required placeholder="xxxx xxxx xxxx xxxx" minlength="16" maxlength="19">
+                                    </div>
+                                </div>
+                                <div class="gmail-actions">
+                                    <button type="submit" class="btn btn-primary" id="connectGmailBtn">
+                                        <i class="fab fa-google"></i> Connect Account
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="gmail-card" id="gmailScanCard" style="display:none;">
+                        <div class="gmail-card-header">
+                            <h2><i class="fas fa-satellite-dish"></i> Scan for Applications</h2>
+                        </div>
+                        <div class="gmail-card-body">
+                            <div class="scan-options">
+                                <div class="form-group">
+                                    <label><i class="fas fa-calendar-alt"></i> Scan last</label>
+                                    <select id="scanDaysBack" class="filter-select">
+                                        <option value="7">7 days</option>
+                                        <option value="14">14 days</option>
+                                        <option value="30" selected>30 days</option>
+                                        <option value="60">60 days</option>
+                                        <option value="90">90 days</option>
+                                        <option value="180">6 months</option>
+                                        <option value="365">1 year</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary btn-lg" id="startScanBtn">
+                                    <i class="fas fa-search"></i> Scan All Accounts
+                                </button>
+                            </div>
+                            <div class="scan-progress" id="scanProgress" style="display:none;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                <p id="scanProgressText">Scanning your emails...</p>
+                            </div>
+                            <div class="scan-results" id="scanResults" style="display:none;">
+                                <div class="results-summary">
+                                    <div class="result-stat result-found">
+                                        <i class="fas fa-envelope-open-text"></i>
+                                        <span id="resultFound">0</span>
+                                        <label>Found</label>
+                                    </div>
+                                    <div class="result-stat result-imported">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span id="resultImported">0</span>
+                                        <label>Imported</label>
+                                    </div>
+                                    <div class="result-stat result-updated">
+                                        <i class="fas fa-sync-alt"></i>
+                                        <span id="resultUpdated">0</span>
+                                        <label>Updated</label>
+                                    </div>
+                                    <div class="result-stat result-skipped">
+                                        <i class="fas fa-forward"></i>
+                                        <span id="resultSkipped">0</span>
+                                        <label>Duplicates Skipped</label>
+                                    </div>
+                                </div>
+                                <div class="results-table-wrapper">
+                                    <table class="app-table" id="scanResultsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Company</th>
+                                                <th>Role</th>
+                                                <th>Platform</th>
+                                                <th>Status</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ===== MODAL: View / Edit ===== -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="appModal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Application Details</h3>
+                <button class="modal-close" id="modalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
