@@ -1077,6 +1077,18 @@ def serve_static(path):
 #  START
 # ============================================================
 
+# ==================== LEGAL PAGES ====================
+@app.route("/privacy-policy")
+def privacy_policy():
+    """Serve privacy policy page"""
+    return send_from_directory(app.static_folder, "privacy-policy.html")
+
+@app.route("/terms-of-service")
+@app.route("/terms")
+def terms_of_service():
+    """Serve terms of service page"""
+    return send_from_directory(app.static_folder, "terms-of-service.html")
+
 # Initialize database on module load (for gunicorn)
 try:
     init_db()
