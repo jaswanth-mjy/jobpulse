@@ -787,6 +787,16 @@ def scan_status():
 
 
 # ============================================================
+#  HEALTH CHECK (for Render)
+# ============================================================
+
+@app.route("/health")
+def health_check():
+    """Health check endpoint for Render deployment."""
+    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()}), 200
+
+
+# ============================================================
 #  SERVE FRONTEND
 # ============================================================
 
@@ -808,8 +818,14 @@ def serve_static(path):
 #  START
 # ============================================================
 
-if __name__ == "__main__":
+# Initialize database on module load (for gunicorn)
+try:
     init_db()
+    print("✅ Database initialized successfully")
+except Exception as e:
+    print(f"⚠️ Database initialization deferred: {e}")
+
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     print(f"🚀 JobPulse API running on http://localhost:{port}")
     app.run(debug=True, host="0.0.0.0", port=port, use_reloader=False)

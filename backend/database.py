@@ -35,8 +35,8 @@ def get_client():
             tls=True,
             tlsCAFile=certifi.where(),
             server_api=None,
-            serverSelectionTimeoutMS=30000,
-            connectTimeoutMS=30000,
+            serverSelectionTimeoutMS=10000,  # Reduced for faster failure
+            connectTimeoutMS=10000,
             socketTimeoutMS=30000,
         )
     return _client
