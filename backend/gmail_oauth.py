@@ -61,9 +61,9 @@ def get_client_config() -> dict:
         with open(CLIENT_SECRETS_FILE, 'r') as f:
             return json.load(f)
     
-    # Fall back to environment variables
-    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
-    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
+    # Fall back to environment variables (strip whitespace to avoid issues)
+    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
     
     if not client_id or not client_secret:
         raise ValueError("OAuth not configured. Add client_secrets.json or set GOOGLE_OAUTH_CLIENT_ID/SECRET env vars.")
