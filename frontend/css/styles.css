@@ -657,6 +657,30 @@ body {
     font-size: 0.85rem;
 }
 
+.footer-links {
+    margin-top: 12px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.footer-links a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-links a:hover {
+    color: var(--accent-purple);
+    text-decoration: underline;
+}
+
+.footer-links span {
+    color: var(--text-muted);
+}
+
 /* ==========================================
    AUTH MODAL
    ========================================== */
