@@ -878,12 +878,6 @@ function showAlert(title, message, type = "info", containerId = null) {
     
     return alert;
 }
-        toast.style.opacity = "0";
-        toast.style.transform = "translateX(40px)";
-        toast.style.transition = "all 0.3s ease";
-        setTimeout(() => toast.remove(), 300);
-    }, 3500);
-}
 
 // ==========================================
 //  AUTO-SCAN ON LOGIN
