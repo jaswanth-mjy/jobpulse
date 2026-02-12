@@ -221,26 +221,54 @@ def _scan_single_account(account: dict, days_back: int, max_results: int) -> lis
         "greenhouse.io", "lever.co", "icims.com",
         "smartrecruiters.com", "taleo.net",
         "successfactors.com", "workable.com", "ashbyhq.com",
-        "jobvite.com",
+        "jobvite.com", "ultipro.com", "breezy.hr", "recruiterbox.com",
+        "bamboohr.com", "jazz.co", "recruitee.com", "teamtailor.com",
         # Banking / Finance
         "barclays.com", "jpmorgan.com", "jpmorganchase.com",
         "goldmansachs.com", "morganstanley.com", "citi.com",
         "hsbc.com", "standardchartered.com", "wellsfargo.com",
+        "bankofamerica.com", "deutschebank.com", "ubs.com",
+        "credit-suisse.com", "blackrock.com", "fidelity.com",
         # Indian IT
         "infosys.com", "tcs.com", "wipro.com", "hcltech.com",
         "cognizant.com", "ltimindtree.com",
         "mphasis.com", "hexaware.com", "persistent.com",
+        "techmahindra.com", "coforge.com", "mindtree.com",
         # Big Tech
         "google.com", "amazon.com", "microsoft.com", "apple.com",
         "meta.com", "netflix.com", "salesforce.com", "oracle.com",
         "adobe.com", "ibm.com", "intel.com", "nvidia.com",
+        "spotify.com", "snap.com", "twitter.com", "uber.com",
+        "lyft.com", "airbnb.com", "stripe.com", "square.com",
+        "paypal.com", "servicenow.com", "snowflake.com", "databricks.com",
+        "atlassian.com", "slack.com", "zoom.us", "docusign.com",
         # Consulting
         "accenture.com", "deloitte.com", "ey.com", "kpmg.com", "pwc.com",
-        "capgemini.com",
+        "capgemini.com", "bain.com", "bcg.com", "mckinsey.com",
+        "boozallen.com", "slalom.com", "thoughtworks.com",
+        # E-commerce / Retail
+        "flipkart.com", "walmart.com", "target.com", "bestbuy.com",
+        "costco.com", "homedepot.com", "ebay.com", "etsy.com",
+        # Startups / Scale-ups
+        "freshworks.com", "zoho.com", "razorpay.com", "paytm.com",
+        "swiggy.in", "zomato.com", "ola.com", "policybazaar.com",
+        "cred.club", "byju.com", "upgrad.com",
+        # Healthcare / Pharma
+        "amgen.com", "pfizer.com", "jnj.com", "roche.com",
+        "novartis.com", "merck.com", "abbvie.com", "gilead.com",
+        # Automotive / Manufacturing
+        "tesla.com", "ford.com", "gm.com", "bmw.com",
+        "toyota.com", "volkswagen.com", "bosch.com",
+        # Aerospace / Defense
+        "boeing.com", "lockheedmartin.com", "raytheon.com",
+        "northropgrumman.com", "spacex.com", "blueorigin.com",
+        # Telecom
+        "verizon.com", "att.com", "tmobile.com", "vodafone.com",
+        "airtel.in", "jio.com", "ericsson.com", "nokia.com",
         # Other major employers
-        "siemens.com", "cisco.com", "sap.com", "uber.com",
-        "flipkart.com", "freshworks.com", "zoho.com",
-        "amgen.com",
+        "siemens.com", "cisco.com", "sap.com", "vmware.com",
+        "dell.com", "hp.com", "lenovo.com", "ge.com",
+        "honeywell.com", "3m.com", "caterpillar.com",
     ]
 
     # Batch into groups of 5 domains using IMAP OR
@@ -268,15 +296,30 @@ def _scan_single_account(account: dict, days_back: int, max_results: int) -> lis
         ('linkedin.com', 'application'),
         ('linkedin.com', 'you applied'),
         ('linkedin.com', 'application was sent'),
+        ('linkedin.com', 'thank you for applying'),
         ('naukri.com', 'successfully applied'),
         ('naukri.com', 'application confirmation'),
         ('naukri.com', 'your application for'),
+        ('naukri.com', 'profile sent'),
         ('indeed.com', 'you applied'),
         ('indeed.com', 'application submitted'),
+        ('indeed.com', 'application sent'),
         ('glassdoor.com', 'application submitted'),
+        ('glassdoor.com', 'you applied'),
         ('wellfound.com', 'application'),
+        ('wellfound.com', 'you applied'),
         ('instahyre.com', 'application'),
+        ('instahyre.com', 'profile shared'),
         ('internshala.com', 'applied'),
+        ('internshala.com', 'application'),
+        ('monster.com', 'application'),
+        ('monster.com', 'you applied'),
+        ('shine.com', 'applied'),
+        ('shine.com', 'application sent'),
+        ('apna.co', 'applied'),
+        ('foundit.in', 'application'),
+        ('hirist.com', 'applied'),
+        ('cutshort.io', 'application'),
     ]
     print(f"  🔍 Searching {len(platform_targeted_searches)} platform-targeted queries...")
     for sender_domain, keyword in platform_targeted_searches:
@@ -289,15 +332,34 @@ def _scan_single_account(account: dict, days_back: int, max_results: int) -> lis
     # TIER 4: Subject-only searches (catch from unknown domains)
     # ------------------------------------------------------------------
     subject_keywords = [
+        # Application confirmations
         "application submitted", "application was sent",
         "successfully applied", "application confirmation",
         "thank you for applying", "we received your application",
-        "thank you for your application",
+        "thank you for your application", "application received",
+        "your application to", "application for the position",
+        "application has been submitted", "we have received your application",
+        # Rejections
         "regret to inform", "not been selected",
         "not moving forward", "after careful consideration",
+        "unfortunately", "will not be moving forward",
+        "decided to pursue other candidates", "position has been filled",
+        "unsuccessful", "did not progress",
+        # Interviews
         "interview scheduled", "interview invitation",
+        "invite you to interview", "schedule an interview",
+        "interview opportunity", "next steps in the interview",
+        "phone screen", "technical interview", "onsite interview",
+        # Assessments
         "assessment invitation", "online assessment",
-        "coding challenge",
+        "coding challenge", "technical assessment",
+        "complete the assessment", "take home assignment",
+        "coding test", "technical evaluation",
+        # Role-specific keywords
+        "software engineer position", "data scientist role",
+        "product manager opening", "designer position",
+        "analyst role", "developer position",
+        "intern application", "internship confirmation",
     ]
     print(f"  🔍 Searching {len(subject_keywords)} subject keywords...")
     for keyword in subject_keywords:

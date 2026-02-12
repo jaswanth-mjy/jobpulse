@@ -1036,11 +1036,27 @@ def _extract_role_generic(subject, body_preview):
         # "application for Software Engineer at Company"
         r"(?:application for|applied (?:for|to))\s+(?:the\s+)?(?:position\s+of\s+)?(.+?)\s+(?:at|with)\b",
         # "position of: Software Engineer" or "role: Data Analyst"
-        r"(?:position|role|job)\s*(?:of|:)\s+(.+?)(?:[.,;\n]|\s+(?:at|with)\b)",
+        r"(?:position|role|job|opening)\s*(?:of|:|for|as)\s+(.+?)(?:[.,;\n]|\s+(?:at|with|in)\b)",
         # "the Software Developer role at" / "the Software Engineer position at"
-        r"(?:the|a)\s+(.+?)\s+(?:role|position)\s+(?:at|with)\b",
+        r"(?:the|a|an)\s+(.+?)\s+(?:role|position|opening|opportunity)\s+(?:at|with|in)\b",
         # "for the Software Engineer position"
-        r"for the\s+(.+?)\s+(?:position|role)\b",
+        r"for (?:the|a|an)\s+(.+?)\s+(?:position|role|opening)\b",
+        # "as a Software Engineer at" / "as Software Developer with"
+        r"as\s+(?:a|an)\s+(.+?)\s+(?:at|with|in)\b",
+        # "Software Engineer - Company" / "Data Scientist | Company"
+        r"^(.+?)\s+[-|]\s+[A-Z]",
+        # "Your application: Software Engineer"
+        r"your application:\s+(.+?)(?:[.,;\n]|$)",
+        # "Job title: Software Engineer"
+        r"job title:\s+(.+?)(?:[.,;\n]|\s+(?:at|with|in)\b)",
+        # "Role title: Data Analyst"
+        r"role title:\s+(.+?)(?:[.,;\n]|\s+(?:at|with|in)\b)",
+        # Common role titles standalone
+        r"(?:senior|junior|lead|principal|staff)\s+(?:software|full[\s-]?stack|frontend|front[\s-]?end|backend|back[\s-]?end|mobile|ios|android|devops|cloud|data|machine[\s-]?learning|ai|ml)\s+(?:engineer|developer|architect)",
+        r"(?:data|business|financial|market|systems?|security|quality)\s+analyst",
+        r"(?:product|project|program|engineering|technical)\s+manager",
+        r"(?:ui|ux|product|graphic|web)\s+designer",
+        r"(?:intern|internship|trainee|associate|consultant|specialist|coordinator)",
     ]
     # Search subject and body separately to avoid cross-matching
     for text in [subject, body_preview]:

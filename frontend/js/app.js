@@ -16,6 +16,8 @@ let platforms = [];
 let statuses = [];
 let authToken = localStorage.getItem("jobpulse_token") || null;
 let currentUser = JSON.parse(localStorage.getItem("jobpulse_user") || "null");
+let recentlyUpdatedIds = new Set(); // Track recently updated applications
+let recentlyImportedIds = new Set(); // Track recently imported applications
 
 // ========== DOM REFS ==========
 const $ = (sel) => document.querySelector(sel);
@@ -522,14 +524,22 @@ function renderRecentTable() {
         return;
     }
 
-    tbody.innerHTML = recent.map((app) => `
-        <tr style="cursor:pointer" onclick="viewApplication('${app.id}')">
+    tbody.innerHTML = recent.map((app) => {
+        const isUpdated = recentlyUpdatedIds.has(app.id);
+        const isNew = recentlyImportedIds.has(app.id);
+        const rowStyle = isUpdated ? 'background: rgba(245, 158, 11, 0.1); cursor:pointer;' : 
+                         isNew ? 'background: rgba(16, 185, 129, 0.1); cursor:pointer;' : 'cursor:pointer';
+        const updateBadge = isUpdated ? ' <span style="color:#f59e0b;font-size:0.75em">↻ Updated</span>' : 
+                           isNew ? ' <span style="color:#10b981;font-size:0.75em">✓ New</span>' : '';
+        return `
+        <tr style="${rowStyle}" onclick="viewApplication('${app.id}')">
             <td class="company-cell">${esc(app.company)}</td>
             <td>${esc(app.role)}</td>
             <td>${platformBadge(app.platform)}</td>
-            <td>${statusBadge(app.status)}</td>
+            <td>${statusBadge(app.status)}${updateBadge}</td>
             <td>${formatDate(app.applied_date)}</td>
-        </tr>`).join("");
+        </tr>`;
+    }).join("");
 }
 
 // ========== APPLICATIONS TABLE ==========
@@ -545,12 +555,19 @@ function renderApplicationsTable() {
     }
 
     if (empty) empty.style.display = "none";
-    tbody.innerHTML = allApplications.map((app) => `
-        <tr>
+    tbody.innerHTML = allApplications.map((app) => {
+        const isUpdated = recentlyUpdatedIds.has(app.id);
+        const isNew = recentlyImportedIds.has(app.id);
+        const rowStyle = isUpdated ? 'background: rgba(245, 158, 11, 0.1);' : 
+                         isNew ? 'background: rgba(16, 185, 129, 0.1);' : '';
+        const updateBadge = isUpdated ? ' <span style="color:#f59e0b;font-size:0.75em;font-weight:600">↻ Updated</span>' : 
+                           isNew ? ' <span style="color:#10b981;font-size:0.75em;font-weight:600">✓ New</span>' : '';
+        return `
+        <tr style="${rowStyle}">
             <td class="company-cell">${esc(app.company)}</td>
             <td>${esc(app.role)}</td>
             <td>${platformBadge(app.platform)}</td>
-            <td>${statusBadge(app.status)}</td>
+            <td>${statusBadge(app.status)}${updateBadge}</td>
             <td>${esc(app.location || "—")}</td>
             <td>${esc(app.salary || "—")}</td>
             <td>${formatDate(app.applied_date)}</td>
@@ -567,7 +584,8 @@ function renderApplicationsTable() {
                     </button>
                 </div>
             </td>
-        </tr>`).join("");
+        </tr>`;
+    }).join("");
 }
 
 // ========== FORM HANDLING ==========
@@ -797,7 +815,30 @@ async function pollScanStatus() {
                 const r = data.result;
                 if (r.imported > 0 || r.updated > 0) {
                     showToast(`✅ Auto-scan: ${r.imported} new, ${r.updated || 0} updated applications imported!`, "success");
+                    
+                    // Track which apps were updated/imported from auto-scan
+                    recentlyUpdatedIds.clear();
+                    recentlyImportedIds.clear();
+                    
+                    if (r.applications) {
+                        r.applications.forEach(app => {
+                            if (app._action === "updated") {
+                                recentlyUpdatedIds.add(app.id);
+                            } else if (app._action === "new") {
+                                recentlyImportedIds.add(app.id);
+                            }
+                        });
+                    }
+                    
                     await refreshData();  // Refresh dashboard with new data
+                    
+                    // Clear highlights after 10 seconds
+                    setTimeout(() => {
+                        recentlyUpdatedIds.clear();
+                        recentlyImportedIds.clear();
+                        renderDashboard();
+                        renderApplicationsTable();
+                    }, 10000);
                 } else if (r.found > 0) {
                     showToast("Auto-scan complete — all applications already up to date.", "info");
                 }
@@ -1119,7 +1160,29 @@ async function startGmailScan() {
                 showToast(data.message, (data.imported > 0 || data.updated > 0) ? "success" : "info");
 
                 if (data.imported > 0 || data.updated > 0) {
+                    // Track which apps were updated/imported
+                    recentlyUpdatedIds.clear();
+                    recentlyImportedIds.clear();
+                    
+                    if (data.applications) {
+                        data.applications.forEach(app => {
+                            if (app._action === "updated") {
+                                recentlyUpdatedIds.add(app.id);
+                            } else if (app._action === "new") {
+                                recentlyImportedIds.add(app.id);
+                            }
+                        });
+                    }
+                    
                     refreshData();
+                    
+                    // Clear highlights after 10 seconds
+                    setTimeout(() => {
+                        recentlyUpdatedIds.clear();
+                        recentlyImportedIds.clear();
+                        renderDashboard();
+                        renderApplicationsTable();
+                    }, 10000);
                 }
             } else {
                 showToast(data.error || "Scan failed", "error");
