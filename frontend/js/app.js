@@ -12,6 +12,7 @@ const GOOGLE_CLIENT_ID = "160223116353-vg7bu7da2t1ilb90uhd9h4o7qmirldf0.apps.goo
 
 // ========== STATE ==========
 let allApplications = [];
+let invalidApplications = []; // Track applications that failed validation
 let platforms = [];
 let statuses = [];
 let authToken = localStorage.getItem("jobpulse_token") || null;
@@ -341,13 +342,234 @@ async function refreshData() {
             showLanding();
             return;
         }
-        allApplications = await res.json();
+        const allData = await res.json();
+        
+        // Separate valid and invalid applications, auto-fix status mismatches
+        invalidApplications = [];
+        allApplications = allData.filter(app => {
+            // Try to auto-fix status mismatches before validation
+            if (app.status_history && Array.isArray(app.status_history) && app.status_history.length > 0) {
+                const sortedHistory = [...app.status_history].sort((a, b) => {
+                    return new Date(b.date) - new Date(a.date);
+                });
+                const latestHistoryStatus = sortedHistory[0].status;
+                
+                // If there's a mismatch, auto-fix it
+                if (app.status !== latestHistoryStatus) {
+                    console.log(`🔧 Auto-fixing status mismatch for ${app.company} - ${app.role}: "${app.status}" → "${latestHistoryStatus}"`);
+                    autoFixApplication(app.id, latestHistoryStatus);
+                    app.status = latestHistoryStatus; // Update locally for immediate display
+                }
+            }
+            
+            const isValid = validateApplication(app);
+            if (!isValid) {
+                invalidApplications.push(app);
+            }
+            return isValid;
+        });
+        
+        // Show warning if there are invalid applications, otherwise clear it
+        if (invalidApplications.length > 0) {
+            console.warn(`⚠️ ${invalidApplications.length} applications failed validation and are hidden from dashboard`);
+            console.warn("Invalid applications:", invalidApplications.map(app => `${app.company} - ${app.role}`));
+            showValidationWarning(invalidApplications.length);
+        } else {
+            // Clear any existing validation warning
+            const existing = $("#validationWarning");
+            if (existing) existing.remove();
+            console.log("✅ All applications passed validation");
+        }
 
         renderDashboard();
         renderApplicationsTable();
     } catch (e) {
         console.error("Failed to refresh data:", e);
     }
+}
+
+// ========== VALIDATION WARNING ==========
+function showValidationWarning(count) {
+    const existing = $("#validationWarning");
+    if (existing) existing.remove();
+    
+    const warning = document.createElement("div");
+    warning.id = "validationWarning";
+    warning.className = "validation-warning";
+    warning.innerHTML = `
+        <div class="validation-warning-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>${count} application${count > 1 ? 's' : ''} hidden due to incomplete data</span>
+            <button class="btn btn-sm btn-ghost" onclick="showInvalidApplications()">
+                <i class="fas fa-eye"></i> View & Fix
+            </button>
+        </div>
+    `;
+    
+    const dashboard = $("#dashboardView");
+    if (dashboard) {
+        dashboard.insertBefore(warning, dashboard.firstChild);
+    }
+}
+
+// Show invalid applications modal
+window.showInvalidApplications = function() {
+    const modal = $("#appModal");
+    const overlay = $("#modalOverlay");
+    const title = $("#modalTitle");
+    const body = $("#modalBody");
+    
+    title.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:var(--accent-yellow)"></i> Applications Needing Review';
+    
+    let html = `
+        <div class="invalid-apps-info">
+            <p>These applications have incomplete or invalid data and won't appear on your dashboard until fixed:</p>
+        </div>
+        <div class="invalid-apps-list">
+    `;
+    
+    invalidApplications.forEach(app => {
+        const issues = [];
+        if (!app.company || !app.company.trim()) issues.push("Missing company name");
+        if (!app.role || !app.role.trim()) issues.push("Missing role/position");
+        if (!app.status || !app.status.trim()) issues.push("Missing status");
+        if (!app.platform || !app.platform.trim()) issues.push("Missing platform");
+        if (!app.applied_date) issues.push("Missing application date");
+        
+        // Check for status mismatch
+        if (app.status_history && Array.isArray(app.status_history) && app.status_history.length > 0) {
+            const sortedHistory = [...app.status_history].sort((a, b) => {
+                return new Date(b.date) - new Date(a.date);
+            });
+            const latestHistoryStatus = sortedHistory[0].status;
+            if (app.status !== latestHistoryStatus) {
+                issues.push(`Status mismatch: Shows "${app.status}" but latest is "${latestHistoryStatus}"`);
+            }
+        }
+        
+        html += `
+            <div class="invalid-app-card">
+                <div class="invalid-app-header">
+                    <h4>${esc(app.company || 'Unknown Company')} - ${esc(app.role || 'Unknown Role')}</h4>
+                    <button class="btn btn-sm btn-primary" onclick="fixApplication('${app.id}')">
+                        <i class="fas fa-pen"></i> Fix Now
+                    </button>
+                </div>
+                <div class="invalid-app-issues">
+                    ${issues.map(issue => `<span class="issue-tag"><i class="fas fa-times-circle"></i> ${issue}</span>`).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `</div>`;
+    body.innerHTML = html;
+    
+    overlay.style.display = "flex";
+    setTimeout(() => {
+        overlay.classList.add("active");
+        modal.classList.add("active");
+    }, 10);
+}
+
+// Fix invalid application - close modal and open edit form
+window.fixApplication = function(id) {
+    // Properly close the invalid apps modal
+    const overlay = $("#modalOverlay");
+    const modal = $("#appModal");
+    
+    overlay.classList.remove("active");
+    modal.classList.remove("active");
+    
+    // Wait for animation, then hide and open edit form
+    setTimeout(() => {
+        overlay.style.display = "none";
+        editApplication(id);
+    }, 300);
+}
+
+// Auto-fix status mismatch by updating status to match latest history
+async function autoFixApplication(id, correctStatus) {
+    try {
+        await authFetch(`${API}/applications/${id}`, {
+            method: "PUT",
+            body: JSON.stringify({ status: correctStatus }),
+        });
+        console.log(`✅ Auto-fixed application ${id} status to "${correctStatus}"`);
+    } catch (e) {
+        console.warn(`❌ Failed to auto-fix application ${id}:`, e);
+    }
+}
+
+// ========== APPLICATION VALIDATION ==========
+function validateApplication(app) {
+    // Essential fields must be present and non-empty
+    if (!app.company || !app.company.trim()) {
+        console.warn(`Invalid application: missing company`, app);
+        return false;
+    }
+    
+    if (!app.role || !app.role.trim()) {
+        console.warn(`Invalid application: missing role for ${app.company}`, app);
+        return false;
+    }
+    
+    if (!app.status || !app.status.trim()) {
+        console.warn(`Invalid application: missing status for ${app.company} - ${app.role}`, app);
+        return false;
+    }
+    
+    if (!app.platform || !app.platform.trim()) {
+        console.warn(`Invalid application: missing platform for ${app.company} - ${app.role}`, app);
+        return false;
+    }
+    
+    if (!app.applied_date) {
+        console.warn(`Invalid application: missing applied_date for ${app.company} - ${app.role}`, app);
+        return false;
+    }
+    
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(app.applied_date)) {
+        console.warn(`Invalid application: invalid date format for ${app.company} - ${app.role}`, app);
+        return false;
+    }
+    
+    // Validate status is from allowed list
+    const validStatuses = [
+        "Applied", "Viewed", "In Review", "Phone Screen", 
+        "Interview Scheduled", "Interviewed", "Technical Round", 
+        "HR Round", "Assessment", "Offer Received", "Accepted", 
+        "Rejected", "Withdrawn", "Ghosted"
+    ];
+    if (!validStatuses.includes(app.status)) {
+        console.warn(`Invalid application: unknown status "${app.status}" for ${app.company} - ${app.role}`, app);
+        return false;
+    }
+    
+    // CRITICAL: Check status_history consistency
+    if (app.status_history && Array.isArray(app.status_history) && app.status_history.length > 0) {
+        // Get the most recent status from history
+        const sortedHistory = [...app.status_history].sort((a, b) => {
+            return new Date(b.date) - new Date(a.date);
+        });
+        
+        const latestHistoryStatus = sortedHistory[0].status;
+        
+        // If current status doesn't match latest history, it's outdated/inconsistent
+        if (app.status !== latestHistoryStatus) {
+            console.warn(
+                `⚠️ Status mismatch for ${app.company} - ${app.role}: ` +
+                `Current="${app.status}", Latest in history="${latestHistoryStatus}". ` +
+                `This application needs manual review.`
+            );
+            return false;
+        }
+    }
+    
+    // All validations passed
+    return true;
 }
 
 // ========== EVENT LISTENERS ==========
@@ -402,6 +624,10 @@ function setupEventListeners() {
     // Gmail
     $("#scanGmailBtn").addEventListener("click", () => setView("gmail"));
     $("#startScanBtn").addEventListener("click", startGmailScan);
+    $("#viewImportedAppsBtn").addEventListener("click", () => {
+        setView("applications");
+        showToast("Showing imported applications", "info");
+    });
     setupGmailForm();
 }
 
@@ -517,10 +743,18 @@ function renderStatusChart(data) {
 function renderRecentTable() {
     const tbody = $("#recentTable tbody");
     if (!tbody) return;
-    const recent = allApplications.slice(0, 5);
+    
+    // Sort by updated_date to show most recently changed applications first
+    const sortedApps = [...allApplications].sort((a, b) => {
+        const dateA = new Date(a.updated_date || a.applied_date);
+        const dateB = new Date(b.updated_date || b.applied_date);
+        return dateB - dateA;
+    });
+    
+    const recent = sortedApps.slice(0, 5);
 
     if (recent.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:30px;">No applications yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px;">No applications yet</td></tr>';
         return;
     }
 
@@ -531,13 +765,19 @@ function renderRecentTable() {
                          isNew ? 'background: rgba(16, 185, 129, 0.08); cursor:pointer; transition: all 0.3s ease;' : 'cursor:pointer; transition: all 0.3s ease;';
         const updateBadge = isUpdated ? ' <span class="update-badge updated"><i class="fas fa-sync-alt"></i>Updated</span>' : 
                            isNew ? ' <span class="update-badge new"><i class="fas fa-check-circle"></i>New</span>' : '';
+        
+        // Show when it was last updated
+        const lastUpdate = app.updated_date && app.updated_date !== app.applied_date 
+            ? `<span style="color:var(--text-muted);font-size:0.85rem;display:block;margin-top:2px;">Updated ${formatDate(app.updated_date)}</span>`
+            : '';
+        
         return `
         <tr style="${rowStyle}" onclick="viewApplication('${app.id}')">
             <td class="company-cell">${esc(app.company)}</td>
             <td>${esc(app.role)}</td>
             <td>${platformBadge(app.platform)}</td>
             <td>${statusBadge(app.status)}${updateBadge}</td>
-            <td>${formatDate(app.applied_date)}</td>
+            <td>${formatDate(app.applied_date)}${lastUpdate}</td>
         </tr>`;
     }).join("");
 }
@@ -712,11 +952,42 @@ async function viewApplication(id) {
             ["Notes", app.notes || "—"],
         ];
 
-        $("#modalBody").innerHTML = fields.map(([label, value]) => `
+        let detailsHTML = fields.map(([label, value]) => `
             <div class="modal-detail">
                 <span class="modal-detail-label">${label}</span>
                 <span class="modal-detail-value">${value}</span>
             </div>`).join("");
+        
+        // Add status history timeline if available
+        if (app.status_history && app.status_history.length > 0) {
+            detailsHTML += `
+                <div class="modal-detail" style="margin-top:24px;border-top:1px solid var(--border-color);padding-top:20px;">
+                    <span class="modal-detail-label" style="font-size:1rem;color:var(--text-primary);margin-bottom:16px;display:block;">
+                        <i class="fas fa-history"></i> Status Timeline
+                    </span>
+                    <div class="status-timeline">
+                        ${app.status_history.map((entry, index) => {
+                            const icon = entry.source === 'gmail_scan' ? 'fa-envelope' : 'fa-edit';
+                            const isLatest = index === app.status_history.length - 1;
+                            return `
+                                <div class="timeline-item ${isLatest ? 'latest' : ''}">
+                                    <div class="timeline-marker">
+                                        <i class="fas ${icon}"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-status">${statusBadge(entry.status)}</div>
+                                        <div class="timeline-date">${formatDate(entry.date)}</div>
+                                        <div class="timeline-source">${entry.source === 'gmail_scan' ? 'Gmail Scan' : 'Manual Update'}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }).reverse().join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        $("#modalBody").innerHTML = detailsHTML;
 
         $("#modalOverlay").classList.add("active");
     } catch (e) {
@@ -747,51 +1018,120 @@ async function clearAllApplications() {
         return;
     }
     
-    const confirmMessage = `⚠️ WARNING: This will permanently delete ALL ${count} applications!\n\nThis action cannot be undone.\n\nType "DELETE ALL" to confirm:`;
+    // Show custom confirmation dialog
+    showConfirmDialog(
+        `⚠️ Delete ALL ${count} Applications?`,
+        `This will permanently delete all your applications. This action cannot be undone.<br><br>Type <strong>DELETE ALL</strong> to confirm:`,
+        'DELETE ALL',
+        async () => {
+            // Confirmed - proceed with deletion
+            try {
+                const btn = document.querySelector('.btn-danger[onclick*="clearAllApplications"]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+                }
+
+                const res = await authFetch(`${API}/applications/clear/all`, { 
+                    method: "DELETE" 
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    showToast(`✅ Successfully deleted ${result.deleted_count} applications!`, "success");
+                    await refreshData();
+                } else {
+                    showToast(result.error || "Failed to delete applications", "error");
+                }
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Data';
+                }
+            } catch (e) {
+                showToast("Failed to delete applications. Please try again.", "error");
+                console.error("Clear all error:", e);
+                
+                const btn = document.querySelector('.btn-danger[onclick*="clearAllApplications"]');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Data';
+                }
+            }
+        }
+    );
+}
+
+// ========== CUSTOM CONFIRMATION DIALOG ==========
+function showConfirmDialog(title, message, requiredText = null, onConfirm = null, onCancel = null) {
+    const dialog = $("#confirmDialog");
+    const titleEl = $("#confirmTitle");
+    const messageEl = $("#confirmMessage");
+    const inputWrapper = $("#confirmInputWrapper");
+    const input = $("#confirmInput");
+    const hint = $("#confirmHint");
+    const okBtn = $("#confirmOkBtn");
+    const cancelBtn = $("#confirmCancelBtn");
     
-    const userInput = prompt(confirmMessage);
+    // Set content
+    titleEl.textContent = title;
+    messageEl.innerHTML = message;
     
-    if (userInput !== "DELETE ALL") {
-        if (userInput !== null) {
-            showToast("Clear cancelled - confirmation text did not match", "info");
-        }
-        return;
-    }
-
-    try {
-        const btn = event.target.closest('button');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-        }
-
-        const res = await authFetch(`${API}/applications/clear/all`, { 
-            method: "DELETE" 
-        });
-
-        const result = await res.json();
-
-        if (res.ok) {
-            showToast(`✅ Successfully deleted ${result.deleted_count} applications!`, "success");
-            await refreshData();
-        } else {
-            showToast(result.error || "Failed to delete applications", "error");
-        }
-
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Data';
-        }
-    } catch (e) {
-        showToast("Failed to delete applications. Please try again.", "error");
-        console.error("Clear all error:", e);
+    // Handle input requirement
+    if (requiredText) {
+        inputWrapper.style.display = "block";
+        input.value = "";
+        input.placeholder = `Type "${requiredText}" to confirm...`;
+        hint.textContent = `You must type exactly: ${requiredText}`;
+        okBtn.disabled = true;
+        okBtn.style.opacity = "0.5";
         
-        const btn = event.target.closest('button');
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Data';
-        }
+        // Validate input
+        input.oninput = () => {
+            if (input.value === requiredText) {
+                input.classList.add("valid");
+                okBtn.disabled = false;
+                okBtn.style.opacity = "1";
+            } else {
+                input.classList.remove("valid");
+                okBtn.disabled = true;
+                okBtn.style.opacity = "0.5";
+            }
+        };
+    } else {
+        inputWrapper.style.display = "none";
+        okBtn.disabled = false;
+        okBtn.style.opacity = "1";
     }
+    
+    // Handle confirm
+    okBtn.onclick = () => {
+        if (requiredText && input.value !== requiredText) {
+            return;
+        }
+        hideConfirmDialog();
+        if (onConfirm) onConfirm();
+    };
+    
+    // Handle cancel
+    cancelBtn.onclick = () => {
+        hideConfirmDialog();
+        if (onCancel) onCancel();
+    };
+    
+    // Show dialog
+    dialog.classList.add("active");
+    
+    // Focus input if required
+    if (requiredText) {
+        setTimeout(() => input.focus(), 100);
+    }
+}
+
+function hideConfirmDialog() {
+    const dialog = $("#confirmDialog");
+    dialog.classList.remove("active");
 }
 
 // ========== HELPERS ==========

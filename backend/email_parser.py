@@ -184,6 +184,23 @@ REJECTION_KEYWORDS = [
     "will not be proceeding",
     "unable to offer you",
     "cannot offer you",
+    "not advance your application",
+    "not advancing your application",
+    "will not advance",
+    "decline to move forward",
+    "declining to move forward",
+    "not proceeding with your application",
+    "not proceed with your application",
+    "chosen not to proceed",
+    "chosen to proceed with other",
+    "have chosen other candidates",
+    "other candidates more closely",
+    "more closely aligned",
+    "better suited candidates",
+    "candidates whose",
+    "won't be progressing",
+    "not progress to the next",
+    "application will not be progressing",
 ]
 
 
@@ -807,15 +824,46 @@ def identify_platform(sender_email):
 
 
 def _is_confirmation_email(subject, body_preview):
-    """Return True only if the email is an actual application confirmation."""
+    """Return True only if the email is an actual application confirmation.
+    Excludes Google Forms and other non-job confirmations."""
     combined = (subject + " " + body_preview).lower()
+    
+    # Exclude non-job confirmations
+    if any(keyword in combined for keyword in [
+        "google form", "form submission", "survey", "questionnaire",
+        "feedback form", "typeform", "surveymonkey"
+    ]):
+        return False
+    
     return any(kw in combined for kw in CONFIRMATION_KEYWORDS)
 
 
 def _is_rejection_email(subject, body_preview):
-    """Return True if the email is a rejection / not-selected notification."""
+    """Return True if the email is a rejection / not-selected notification.
+    Requires both rejection keywords AND job-related context to avoid false positives."""
     combined = (subject + " " + body_preview).lower()
-    return any(kw in combined for kw in REJECTION_KEYWORDS)
+    
+    # First check: must contain rejection keywords
+    has_rejection_keyword = any(kw in combined for kw in REJECTION_KEYWORDS)
+    if not has_rejection_keyword:
+        return False
+    
+    # Second check: must have job/application context (avoid false positives like forms, surveys)
+    job_context_keywords = [
+        "application", "position", "role", "candidate", "interview",
+        "job", "applied", "opportunity", "hiring", "recruitment",
+        "resume", "cv", "career", "employer", "vacancy"
+    ]
+    has_job_context = any(kw in combined for kw in job_context_keywords)
+    
+    # Exclude if it's clearly not job-related
+    non_job_indicators = [
+        "google form", "survey", "questionnaire", "feedback form",
+        "poll", "registration", "rsvp", "event", "webinar"
+    ]
+    is_non_job = any(indicator in combined for indicator in non_job_indicators)
+    
+    return has_rejection_keyword and has_job_context and not is_non_job
 
 
 def _is_interview_email(subject, body_preview):
@@ -868,7 +916,21 @@ def _is_from_trusted_job_domain(sender):
 
 
 def _should_reject(subject):
-    """Return True if the subject matches a known digest/alert pattern."""
+    """Return True if the subject matches a known digest/alert pattern or non-job email."""
+    # Quick reject for Google Forms and surveys
+    if any(keyword in subject.lower() for keyword in [
+        "google forms",
+        "form submission",
+        "form response",
+        "survey response",
+        "questionnaire",
+        "thanks for filling",
+        "typeform",
+        "surveymonkey",
+        "jotform"
+    ]):
+        return True
+    
     return bool(_REJECT_RE.search(subject))
 
 
@@ -1104,6 +1166,7 @@ def parse_email(sender, subject, body, date_str):
     if is_reject:
         status = "Rejected"
         email_type = "rejected"
+        print(f"📧 REJECTION detected: '{subject[:50]}...'")
     elif is_assessment:
         status = "Assessment"
         email_type = "assessment"

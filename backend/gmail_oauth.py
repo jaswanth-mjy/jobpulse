@@ -276,192 +276,154 @@ def scan_emails_oauth(creds_dict: dict, days_back: int = 90, max_results: int = 
     
     since_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y/%m/%d")
     
-    # Build search queries for job-related emails
+    # OPTIMIZED: Single comprehensive query approach for speed
+    # Combine all high-confidence domains in one large query
     search_queries = []
     
-    # TIER 1 + 2: ATS platforms + Company domains (comprehensive list)
-    all_sender_domains = [
-        # ATS platforms (low noise, high signal)
-        "myworkday.com", "myworkdayjobs.com",
-        "greenhouse.io", "lever.co", "icims.com",
-        "smartrecruiters.com", "taleo.net",
-        "successfactors.com", "workable.com", "ashbyhq.com",
-        "jobvite.com", "ultipro.com", "breezy.hr", "recruiterbox.com",
-        "bamboohr.com", "jazz.co", "recruitee.com", "teamtailor.com",
-        # Banking / Finance
-        "barclays.com", "jpmorgan.com", "jpmorganchase.com",
-        "goldmansachs.com", "morganstanley.com", "citi.com",
-        "hsbc.com", "standardchartered.com", "wellsfargo.com",
-        "bankofamerica.com", "deutschebank.com", "ubs.com",
-        "credit-suisse.com", "blackrock.com", "fidelity.com",
+    # Priority domains: ATS platforms (highest signal-to-noise ratio)
+    ats_domains = [
+        "myworkday.com", "myworkdayjobs.com", "greenhouse.io", "lever.co", 
+        "icims.com", "smartrecruiters.com", "taleo.net", "successfactors.com", 
+        "workable.com", "ashbyhq.com", "jobvite.com", "ultipro.com", 
+        "breezy.hr", "recruiterbox.com", "bamboohr.com", "jazz.co", 
+        "recruitee.com", "teamtailor.com",
+    ]
+    
+    # Major company domains (verified reliable senders)
+    company_domains = [
+        # Tech Giants
+        "google.com", "amazon.com", "microsoft.com", "apple.com", "meta.com", 
+        "netflix.com", "salesforce.com", "oracle.com", "adobe.com", "ibm.com",
+        "intel.com", "nvidia.com", "spotify.com", "uber.com", "lyft.com",
+        "airbnb.com", "stripe.com", "paypal.com", "servicenow.com",
+        # Finance
+        "jpmorgan.com", "goldmansachs.com", "morganstanley.com", "citi.com",
+        "blackrock.com", "wellsfargo.com", "bankofamerica.com",
         # Indian IT
-        "infosys.com", "tcs.com", "wipro.com", "hcltech.com",
-        "cognizant.com", "ltimindtree.com",
-        "mphasis.com", "hexaware.com", "persistent.com",
-        "techmahindra.com", "coforge.com", "mindtree.com",
-        # Big Tech
-        "google.com", "amazon.com", "microsoft.com", "apple.com",
-        "meta.com", "netflix.com", "salesforce.com", "oracle.com",
-        "adobe.com", "ibm.com", "intel.com", "nvidia.com",
-        "spotify.com", "snap.com", "twitter.com", "uber.com",
-        "lyft.com", "airbnb.com", "stripe.com", "square.com",
-        "paypal.com", "servicenow.com", "snowflake.com", "databricks.com",
-        "atlassian.com", "slack.com", "zoom.us", "docusign.com",
+        "infosys.com", "tcs.com", "wipro.com", "hcltech.com", "cognizant.com",
+        "ltimindtree.com", "techmahindra.com",
         # Consulting
         "accenture.com", "deloitte.com", "ey.com", "kpmg.com", "pwc.com",
-        "capgemini.com", "bain.com", "bcg.com", "mckinsey.com",
-        "boozallen.com", "slalom.com", "thoughtworks.com",
-        # E-commerce / Retail
-        "flipkart.com", "walmart.com", "target.com", "bestbuy.com",
-        "costco.com", "homedepot.com", "ebay.com", "etsy.com",
-        # Startups / Scale-ups
-        "freshworks.com", "zoho.com", "razorpay.com", "paytm.com",
-        "swiggy.in", "zomato.com", "ola.com", "policybazaar.com",
-        "cred.club", "byju.com", "upgrad.com",
-        # Healthcare / Pharma
-        "amgen.com", "pfizer.com", "jnj.com", "roche.com",
-        "novartis.com", "merck.com", "abbvie.com", "gilead.com",
-        # Automotive / Manufacturing
-        "tesla.com", "ford.com", "gm.com", "bmw.com",
-        "toyota.com", "volkswagen.com", "bosch.com",
-        # Aerospace / Defense
-        "boeing.com", "lockheedmartin.com", "raytheon.com",
-        "northropgrumman.com", "spacex.com", "blueorigin.com",
-        # Telecom
-        "verizon.com", "att.com", "tmobile.com", "vodafone.com",
-        "airtel.in", "jio.com", "ericsson.com", "nokia.com",
-        # Other major employers
-        "siemens.com", "cisco.com", "sap.com", "vmware.com",
-        "dell.com", "hp.com", "lenovo.com", "ge.com",
-        "honeywell.com", "3m.com", "caterpillar.com",
+        "mckinsey.com", "bcg.com", "bain.com",
     ]
     
-    print(f"  🔍 Searching {len(all_sender_domains)} company/ATS domains...")
-    # Search by sender domain
-    for domain in all_sender_domains:
-        search_queries.append(f"from:{domain} after:{since_date}")
-    
-    # TIER 3: Job platforms - TARGETED (sender + subject together)
-    platform_targeted_searches = [
-        ('linkedin.com', 'application'),
-        ('linkedin.com', 'you applied'),
-        ('linkedin.com', 'application was sent'),
-        ('linkedin.com', 'thank you for applying'),
-        ('naukri.com', 'successfully applied'),
-        ('naukri.com', 'application confirmation'),
-        ('naukri.com', 'your application for'),
-        ('naukri.com', 'profile sent'),
-        ('indeed.com', 'you applied'),
-        ('indeed.com', 'application submitted'),
-        ('indeed.com', 'application sent'),
-        ('glassdoor.com', 'application submitted'),
-        ('glassdoor.com', 'you applied'),
-        ('wellfound.com', 'application'),
-        ('wellfound.com', 'you applied'),
-        ('instahyre.com', 'application'),
-        ('instahyre.com', 'profile shared'),
-        ('internshala.com', 'applied'),
-        ('internshala.com', 'application'),
-        ('monster.com', 'application'),
-        ('monster.com', 'you applied'),
-        ('shine.com', 'applied'),
-        ('shine.com', 'application sent'),
-        ('apna.co', 'applied'),
-        ('foundit.in', 'application'),
-        ('hirist.com', 'applied'),
-        ('cutshort.io', 'application'),
+    # Job board platforms (catch-all for platforms)
+    job_platforms = [
+        "linkedin.com", "naukri.com", "indeed.com", "glassdoor.com",
+        "wellfound.com", "instahyre.com", "internshala.com",
     ]
     
-    print(f"  🔍 Searching {len(platform_targeted_searches)} platform-targeted queries...")
-    for sender_domain, keyword in platform_targeted_searches:
-        search_queries.append(f'from:{sender_domain} subject:"{keyword}" after:{since_date}')
+    # Combine all into larger batches (20 domains per query for speed)
+    all_domains = ats_domains + company_domains + job_platforms
+    batch_size = 20
+    num_batches = (len(all_domains) + batch_size - 1) // batch_size
+    print(f"  🚀 Fast search: {len(all_domains)} domains in {num_batches} queries...")
     
-    # TIER 4: Subject-only searches (catch from unknown domains)
-    subject_keywords = [
-        # Application confirmations
-        "application submitted", "application was sent",
-        "successfully applied", "application confirmation",
-        "thank you for applying", "we received your application",
-        "thank you for your application", "application received",
-        "your application to", "application for the position",
-        "application has been submitted", "we have received your application",
-        # Rejections
-        "regret to inform", "not been selected",
-        "not moving forward", "after careful consideration",
-        "unfortunately", "will not be moving forward",
-        "decided to pursue other candidates", "position has been filled",
-        "unsuccessful", "did not progress",
-        # Interviews
-        "interview scheduled", "interview invitation",
-        "invite you to interview", "schedule an interview",
-        "interview opportunity", "next steps in the interview",
-        "phone screen", "technical interview", "onsite interview",
-        # Assessments
-        "assessment invitation", "online assessment",
-        "coding challenge", "technical assessment",
-        "complete the assessment", "take home assignment",
-        "coding test", "technical evaluation",
-        # Role-specific keywords
-        "software engineer position", "data scientist role",
-        "product manager opening", "designer position",
-        "analyst role", "developer position",
-        "intern application", "internship confirmation",
+    for i in range(0, len(all_domains), batch_size):
+        batch = all_domains[i:i + batch_size]
+        or_query = " OR ".join(f"from:{domain}" for domain in batch)
+        search_queries.append(f"({or_query}) after:{since_date}")
+    
+    # High-value subject keywords only (skip redundant platform searches since domains already cover them)
+    # Focus on job-specific terms that are unlikely to be spam
+    critical_keywords = [
+        "application submitted", "successfully applied", "thank you for applying",
+        "interview scheduled", "interview invitation", "coding challenge",
+        "technical assessment", "online assessment", "regret to inform",
+        "not been selected", "position has been filled",
     ]
     
-    print(f"  🔍 Searching {len(subject_keywords)} subject keywords...")
-    for keyword in subject_keywords:
-        search_queries.append(f'subject:"{keyword}" after:{since_date}')
+    # Single batched query for critical keywords
+    batch_size = 5
+    num_keyword_batches = (len(critical_keywords) + batch_size - 1) // batch_size
+    print(f"  🔍 Adding {len(critical_keywords)} critical keywords in {num_keyword_batches} queries...")
+    for i in range(0, len(critical_keywords), batch_size):
+        batch = critical_keywords[i:i + batch_size]
+        or_query = " OR ".join(f'subject:"{keyword}"' for keyword in batch)
+        search_queries.append(f"({or_query}) after:{since_date}")
     
-    # Collect all message IDs
+    # Collect message IDs with early exit if we have enough
     all_message_ids = set()
+    target_emails = max_results * 2  # Get 2x target to account for filtering
+    
+    print(f"  ⚙️ Executing {len(search_queries)} optimized queries (target: {target_emails} emails)...")
+    query_count = 0
     
     for query in search_queries:
+        # Early exit if we have enough emails
+        if len(all_message_ids) >= target_emails:
+            print(f"  ✓ Reached target ({len(all_message_ids)} emails), skipping remaining queries")
+            break
+            
+        query_count += 1
         try:
             results = service.users().messages().list(
                 userId='me',
                 q=query,
-                maxResults=100
+                maxResults=100  # Reduced for speed - we have larger batches
             ).execute()
             
             messages = results.get('messages', [])
+            if messages:
+                print(f"  📧 Q{query_count}: +{len(messages)} emails (total: {len(all_message_ids)})")
             for msg in messages:
                 all_message_ids.add(msg['id'])
                 
         except HttpError as e:
-            print(f"  ⚠️ Search failed: {e.reason}")
+            if hasattr(e, 'status_code') and e.status_code == 429:
+                print(f"  ⚠️ Rate limit hit! Stopping search.")
+                break
+            continue
+        except Exception as e:
+            print(f"  ⚠️ Unexpected error in query {query_count}: {e}")
             continue
     
-    print(f"  📊 Total unique emails found: {len(all_message_ids)}")
+    print(f"  📊 Found {len(all_message_ids)} unique emails")
     
-    # Limit results
-    message_ids = list(all_message_ids)[:max_results]
-    print(f"📬 Processing {len(message_ids)} potential job emails")
+    # Process emails efficiently with skip tracking
+    message_ids = list(all_message_ids)
+    print(f"📬 Processing {min(len(message_ids), max_results)} emails...")
     
     if not message_ids:
+        print("  ℹ️ No emails found")
         return [], updated_creds
     
     parsed_applications = []
-    seen = set()
+    seen = set()  # Track company+role combinations
+    skipped_msg_ids = set()  # Track message IDs that were skipped
+    processed = 0
+    skipped = 0
     
-    for msg_id in message_ids:
+    # Process only up to max_results (already have enough from search)
+    for msg_id in message_ids[:max_results * 2]:  # 2x buffer for filtering
+        # Skip if this message was already processed and skipped
+        if msg_id in skipped_msg_ids:
+            continue
+            
+        # Early exit if we have enough parsed applications
+        if len(parsed_applications) >= max_results:
+            print(f"  ✓ Reached {max_results} applications, stopping processing")
+            break
+            
+        processed += 1
+        if processed % 100 == 0:
+            print(f"  ⏳ {processed} processed, {len(parsed_applications)} parsed...")
+        
         try:
-            # Get full message
+            # Fetch with minimal format for speed
             msg = service.users().messages().get(
                 userId='me',
                 id=msg_id,
                 format='full'
             ).execute()
             
-            # Extract headers
+            # Extract headers efficiently
             headers = {h['name'].lower(): h['value'] for h in msg['payload'].get('headers', [])}
-            
             sender = decode_mime_header(headers.get('from', ''))
             subject = decode_mime_header(headers.get('subject', ''))
-            date_str = headers.get('date', '')
             
-            # Parse date
+            # Quick date parsing
             try:
-                # Gmail internal timestamp (ms since epoch)
                 internal_date = int(msg.get('internalDate', 0)) / 1000
                 applied_date = datetime.fromtimestamp(internal_date).strftime("%Y-%m-%d")
             except Exception:
@@ -470,24 +432,42 @@ def scan_emails_oauth(creds_dict: dict, days_back: int = 90, max_results: int = 
             # Extract body
             body = get_email_body_from_payload(msg['payload'])
             
-            # Parse the email
+            if not body or len(body.strip()) < 20:
+                skipped += 1
+                skipped_msg_ids.add(msg_id)  # Remember to skip this email
+                continue
+            
+            # Parse the email - parser handles filtering
             app = parse_email(sender, subject, body, applied_date)
             
             if app:
+                # Deduplicate by company+role
                 key = f"{app['company'].lower().strip()}_{app['role'].lower().strip()}"
                 if key not in seen:
                     seen.add(key)
                     parsed_applications.append(app)
-                    print(f"  ✅ {app['platform']}: {app['role']} at {app['company']}")
+                    print(f"  ✅ {app['company']}: {app['role']}")
+                else:
+                    skipped += 1
+                    skipped_msg_ids.add(msg_id)  # Remember duplicate
             else:
-                print(f"  ⏭️ Skipped: [{sender[:50]}] {subject[:80]}")
+                skipped += 1
+                skipped_msg_ids.add(msg_id)  # Remember non-job email
                 
         except HttpError as e:
-            print(f"  ⚠️ Error fetching message: {e.reason}")
+            if hasattr(e, 'status_code') and e.status_code == 429:
+                print(f"  ⚠️ Rate limit hit! Stopping.")
+                break  # Exit early on rate limit
+            skipped += 1
+            skipped_msg_ids.add(msg_id)  # Remember failed email
             continue
-        except Exception as e:
-            print(f"  ⚠️ Error processing message: {e}")
+        except Exception:
+            skipped += 1
+            skipped_msg_ids.add(msg_id)  # Remember failed email
             continue
     
-    print(f"\n🎯 Parsed {len(parsed_applications)} job applications via OAuth!")
+    print(f"\n🎯 Optimized OAuth Scan Complete:")
+    print(f"  • {processed} emails processed")
+    print(f"  • {len(parsed_applications)} applications found")
+    print(f"  • {skipped} filtered/skipped")
     return parsed_applications, updated_creds

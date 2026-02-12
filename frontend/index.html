@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JobPulse — Smart Job Application Tracker</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/dialog-popup.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -500,7 +501,7 @@
 
                 <div class="recent-section">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <h3><i class="fas fa-clock"></i> Recent Applications</h3>
+                        <h3><i class="fas fa-history"></i> Recent Updates</h3>
                         <button class="btn btn-danger btn-sm" onclick="clearAllApplications()" title="Delete all applications">
                             <i class="fas fa-trash-alt"></i> Clear All Data
                         </button>
@@ -513,7 +514,7 @@
                                     <th>Role</th>
                                     <th>Platform</th>
                                     <th>Status</th>
-                                    <th>Applied</th>
+                                    <th>Date</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -639,6 +640,23 @@
             <!-- ===== GMAIL IMPORT VIEW ===== -->
             <section id="gmailView" class="view">
                 <div class="gmail-section">
+                    <!-- Privacy & Security Banner -->
+                    <div class="info-banner">
+                        <div class="info-banner-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="info-banner-content">
+                            <h3>Your Privacy is Our Priority</h3>
+                            <p>
+                                <strong>🔒 100% Secure:</strong> All credentials are encrypted end-to-end. We never log, track, or store your emails.
+                                JobPulse only scans for job-related content locally and discards everything else immediately.
+                            </p>
+                            <p class="info-banner-tip">
+                                <i class="fas fa-lightbulb"></i> <strong>Pro Tip:</strong> App Password method provides faster scanning and more accurate results compared to OAuth.
+                            </p>
+                        </div>
+                    </div>
+
                     <div class="gmail-card" id="gmailAccountsCard">
                         <div class="gmail-card-header">
                             <h2><i class="fas fa-envelope"></i> Gmail Accounts</h2>
@@ -667,32 +685,44 @@
                             <p class="gmail-description" style="margin-bottom: 20px;">Choose how you'd like to connect your Gmail account:</p>
                             
                             <div class="auth-method-options">
-                                <!-- OAuth Option (Recommended) -->
+                                <!-- App Password Option (RECOMMENDED) -->
+                                <div class="auth-method-card recommended-method" id="appPasswordMethodCard">
+                                    <div class="auth-method-icon">
+                                        <i class="fas fa-key"></i>
+                                    </div>
+                                    <div class="recommended-badge">
+                                        <i class="fas fa-star"></i> Recommended for Best Results
+                                    </div>
+                                    <h3>Use App Password</h3>
+                                    <p class="auth-method-desc">
+                                        <strong>⚡ Fastest & most reliable</strong> — Better email parsing with full IMAP access.<br>
+                                        <span class="security-note">
+                                            <i class="fas fa-shield-alt"></i> <strong>100% Safe:</strong> Your credentials are encrypted and never tracked or logged. 
+                                            We only scan job-related emails locally.
+                                        </span>
+                                    </p>
+                                    <button class="btn btn-primary btn-lg" id="showAppPasswordFormBtn">
+                                        <i class="fas fa-key"></i> Use App Password (Recommended)
+                                    </button>
+                                    <div class="method-benefits">
+                                        <div class="benefit-item"><i class="fas fa-check-circle"></i> More accurate results</div>
+                                        <div class="benefit-item"><i class="fas fa-check-circle"></i> Faster scanning</div>
+                                        <div class="benefit-item"><i class="fas fa-check-circle"></i> No API quotas</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- OAuth Option -->
                                 <div class="auth-method-card" id="oauthMethodCard">
                                     <div class="auth-method-icon">
                                         <i class="fab fa-google"></i>
                                     </div>
                                     <h3>Sign in with Google</h3>
                                     <p class="auth-method-desc">
-                                        <span class="badge badge-success">Recommended</span><br>
-                                        Quick & secure — no passwords needed. Uses OAuth 2.0.
+                                        Quick setup with OAuth 2.0 — no passwords needed.<br>
+                                        <span class="note-text">Note: May have slower performance due to API rate limits.</span>
                                     </p>
-                                    <button class="btn btn-primary btn-lg" id="startOAuthBtn">
+                                    <button class="btn btn-secondary" id="startOAuthBtn">
                                         <i class="fab fa-google"></i> Continue with Google
-                                    </button>
-                                </div>
-                                
-                                <!-- App Password Option -->
-                                <div class="auth-method-card">
-                                    <div class="auth-method-icon">
-                                        <i class="fas fa-key"></i>
-                                    </div>
-                                    <h3>Use App Password</h3>
-                                    <p class="auth-method-desc">
-                                        Manual setup with 16-character app password. Works without Google Cloud.
-                                    </p>
-                                    <button class="btn btn-secondary" id="showAppPasswordFormBtn">
-                                        <i class="fas fa-key"></i> Use App Password
                                     </button>
                                 </div>
                             </div>
@@ -807,6 +837,11 @@
                                         <tbody></tbody>
                                     </table>
                                 </div>
+                                <div class="results-actions">
+                                    <button class="btn btn-primary" id="viewImportedAppsBtn">
+                                        <i class="fas fa-list"></i> View All Applications
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -828,6 +863,29 @@
 
     <!-- ===== TOAST ===== -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== CONFIRMATION DIALOG ===== -->
+    <div class="confirm-dialog" id="confirmDialog">
+        <div class="confirm-dialog-content">
+            <div class="confirm-dialog-icon danger">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2 class="confirm-dialog-title" id="confirmTitle">Confirm Action</h2>
+            <p class="confirm-dialog-message" id="confirmMessage">Are you sure you want to proceed?</p>
+            <div class="confirm-input-wrapper" id="confirmInputWrapper" style="display: none;">
+                <input type="text" class="confirm-input" id="confirmInput" placeholder="Type to confirm...">
+                <small class="confirm-hint" id="confirmHint"></small>
+            </div>
+            <div class="confirm-dialog-actions">
+                <button class="btn btn-secondary" id="confirmCancelBtn">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="confirmOkBtn">
+                    <i class="fas fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="js/app.js"></script>
 </body>

@@ -309,13 +309,14 @@ def create_application():
 
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     applied = data.get("applied_date", date.today().isoformat())
+    initial_status = data.get("status", "Applied")
 
     doc = {
         "user_id": ObjectId(g.user_id),
         "company": data["company"],
         "role": data["role"],
         "platform": data["platform"],
-        "status": data.get("status", "Applied"),
+        "status": initial_status,
         "salary": data.get("salary", ""),
         "location": data.get("location", ""),
         "job_url": data.get("job_url", ""),
@@ -324,6 +325,7 @@ def create_application():
         "updated_date": now,
         "interview_date": data.get("interview_date", ""),
         "response_date": data.get("response_date", ""),
+        "status_history": [{"status": initial_status, "date": now, "source": "manual"}],
     }
 
     db = get_db()
@@ -386,6 +388,17 @@ def update_application(app_id):
         return jsonify({"error": "Application not found"}), 404
 
     update_fields = {"updated_date": now}
+    
+    # Track status changes
+    if "status" in data and data["status"] != existing.get("status"):
+        status_history = existing.get("status_history", [])
+        status_history.append({
+            "status": data["status"],
+            "date": now,
+            "source": "manual"
+        })
+        update_fields["status_history"] = status_history
+    
     for field in ["company", "role", "platform", "status", "salary", "location",
                    "job_url", "notes", "applied_date", "interview_date", "response_date"]:
         if data.get(field) is not None:
@@ -629,6 +642,7 @@ def gmail_scan():
             email_type = app_data.get("email_type", "applied")
 
             if email_type in ("rejected", "interview", "assessment"):
+                # Try to find existing application by company name (most recent one)
                 existing = db.applications.find_one(
                     {"user_id": user_oid, "company": {"$regex": f"^{app_data['company']}$", "$options": "i"}},
                     sort=[("applied_date", -1)]
@@ -636,14 +650,40 @@ def gmail_scan():
                 if existing:
                     old_status = existing["status"]
                     new_status = app_data["status"]
+                    
+                    # Always update if status is different, prioritizing negative outcomes
+                    should_update = False
                     if old_status != new_status:
+                        should_update = True
+                    elif email_type == "rejected" and old_status != "Rejected":
+                        # Force update to Rejected even if status field matches
+                        should_update = True
+                    
+                    if should_update:
                         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-                        update_set = {"status": new_status, "updated_date": now}
+                        
+                        # Build status history entry
+                        status_history = existing.get("status_history", [])
+                        status_history.append({
+                            "status": new_status,
+                            "date": now,
+                            "source": "gmail_scan"
+                        })
+                        
+                        update_set = {
+                            "status": new_status, 
+                            "updated_date": now,
+                            "status_history": status_history
+                        }
+                        
                         if email_type == "rejected":
-                            update_set["response_date"] = app_data["applied_date"]
+                            update_set["response_date"] = app_data.get("applied_date", now)
                         if email_type in ("interview", "assessment"):
-                            update_set["interview_date"] = app_data["applied_date"]
-
+                            update_set["interview_date"] = app_data.get("applied_date", now)
+                        
+                        # Add debug logging
+                        print(f"🔄 Updating {existing['company']} from '{old_status}' to '{new_status}'")
+                        
                         db.applications.update_one(
                             {"_id": existing["_id"]},
                             {"$set": update_set}
@@ -651,17 +691,21 @@ def gmail_scan():
                         updated += 1
                         app_data["id"] = str(existing["_id"])
                         app_data["_action"] = "updated"
+                        app_data["old_status"] = old_status
+                        app_data["new_status"] = new_status
                         imported_apps.append(app_data)
                     else:
+                        print(f"⏭️  Skipping {app_data['company']} - already {old_status}")
                         skipped += 1
                 else:
                     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                    initial_status = app_data.get("status", "Applied")
                     new_doc = {
                         "user_id": user_oid,
                         "company": app_data["company"],
                         "role": app_data["role"],
                         "platform": app_data["platform"],
-                        "status": app_data.get("status", "Applied"),
+                        "status": initial_status,
                         "salary": app_data.get("salary", ""),
                         "location": app_data.get("location", ""),
                         "job_url": app_data.get("job_url", ""),
@@ -670,6 +714,7 @@ def gmail_scan():
                         "updated_date": now,
                         "interview_date": app_data["applied_date"] if email_type == "interview" else "",
                         "response_date": app_data["applied_date"] if email_type == "rejected" else "",
+                        "status_history": [{"status": initial_status, "date": now, "source": "gmail_scan"}],
                     }
                     result = db.applications.insert_one(new_doc)
                     imported += 1
@@ -688,16 +733,18 @@ def gmail_scan():
                     continue
 
                 now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                initial_status = app_data.get("status", "Applied")
                 new_doc = {
                     "user_id": user_oid,
                     "company": app_data["company"],
                     "role": app_data["role"],
                     "platform": app_data["platform"],
-                    "status": app_data.get("status", "Applied"),
+                    "status": initial_status,
                     "salary": app_data.get("salary", ""),
                     "location": app_data.get("location", ""),
                     "job_url": app_data.get("job_url", ""),
                     "notes": app_data.get("notes", ""),
+                    "status_history": [{"status": initial_status, "date": now, "source": "gmail_scan"}],
                     "applied_date": app_data["applied_date"],
                     "updated_date": now,
                     "interview_date": "",
