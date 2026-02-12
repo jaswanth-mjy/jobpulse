@@ -304,7 +304,7 @@
                     <h2>Welcome Back</h2>
                     <p>Sign in to your JobPulse account</p>
                 </div>
-                <form onsubmit="handleSignIn(event)">
+                <form onsubmit="handleSignIn(event)" style="display:none;">
                     <div class="auth-field">
                         <label><i class="fas fa-envelope"></i> Email</label>
                         <input type="email" id="signinEmail" required placeholder="you@example.com">
@@ -318,7 +318,7 @@
                     </button>
                 </form>
 
-                <div class="auth-divider"><span>or</span></div>
+                <div class="auth-divider" style="display:none;"><span>or</span></div>
 
                 <button class="google-signin-btn" id="googleSigninBtn" onclick="triggerGoogleSignIn()">
                     <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
@@ -342,7 +342,7 @@
                     <h2>Create Account</h2>
                     <p>Start tracking your applications for free</p>
                 </div>
-                <form onsubmit="handleSignUp(event)">
+                <form onsubmit="handleSignUp(event)" style="display:none;">
                     <div class="auth-field">
                         <label><i class="fas fa-user"></i> Full Name</label>
                         <input type="text" id="signupName" required placeholder="John Doe">
@@ -360,7 +360,7 @@
                     </button>
                 </form>
 
-                <div class="auth-divider"><span>or</span></div>
+                <div class="auth-divider" style="display:none;"><span>or</span></div>
 
                 <button class="google-signin-btn" id="googleSignupBtn" onclick="triggerGoogleSignIn()">
                     <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
