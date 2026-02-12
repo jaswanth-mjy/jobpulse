@@ -499,7 +499,12 @@
                 </div>
 
                 <div class="recent-section">
-                    <h3><i class="fas fa-clock"></i> Recent Applications</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3><i class="fas fa-clock"></i> Recent Applications</h3>
+                        <button class="btn btn-danger btn-sm" onclick="clearAllApplications()" title="Delete all applications">
+                            <i class="fas fa-trash-alt"></i> Clear All Data
+                        </button>
+                    </div>
                     <div class="table-wrapper">
                         <table class="app-table" id="recentTable">
                             <thead>
@@ -536,6 +541,12 @@
                         <option value="desc">Newest First</option>
                         <option value="asc">Oldest First</option>
                     </select>
+                    <button class="btn btn-secondary btn-sm" onclick="clearFilters()" title="Reset all filters">
+                        <i class="fas fa-redo"></i> Clear Filters
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="clearAllApplications()" title="Delete all applications">
+                        <i class="fas fa-trash-alt"></i> Clear All Data
+                    </button>
                 </div>
                 <div class="table-wrapper">
                     <table class="app-table" id="applicationsTable">

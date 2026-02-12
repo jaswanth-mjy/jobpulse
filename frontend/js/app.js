@@ -728,6 +728,72 @@ function closeModal() {
     $("#modalOverlay").classList.remove("active");
 }
 
+// ========== CLEAR FILTERS ==========
+function clearFilters() {
+    $("#filterPlatform").value = "";
+    $("#filterStatus").value = "";
+    $("#sortBy").value = "applied_date";
+    $("#sortOrder").value = "desc";
+    refreshData();
+    showToast("Filters cleared", "info");
+}
+
+// ========== CLEAR ALL APPLICATIONS ==========
+async function clearAllApplications() {
+    const count = allApplications.length;
+    
+    if (count === 0) {
+        showToast("No applications to delete", "info");
+        return;
+    }
+    
+    const confirmMessage = `⚠️ WARNING: This will permanently delete ALL ${count} applications!\n\nThis action cannot be undone.\n\nType "DELETE ALL" to confirm:`;
+    
+    const userInput = prompt(confirmMessage);
+    
+    if (userInput !== "DELETE ALL") {
+        if (userInput !== null) {
+            showToast("Clear cancelled - confirmation text did not match", "info");
+        }
+        return;
+    }
+
+    try {
+        const btn = event.target.closest('button');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+        }
+
+        const res = await authFetch(`${API}/applications/clear/all`, { 
+            method: "DELETE" 
+        });
+
+        const result = await res.json();
+
+        if (res.ok) {
+            showToast(`✅ Successfully deleted ${result.deleted_count} applications!`, "success");
+            await refreshData();
+        } else {
+            showToast(result.error || "Failed to delete applications", "error");
+        }
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Data';
+        }
+    } catch (e) {
+        showToast("Failed to delete applications. Please try again.", "error");
+        console.error("Clear all error:", e);
+        
+        const btn = event.target.closest('button');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Data';
+        }
+    }
+}
+
 // ========== HELPERS ==========
 function esc(str) {
     const div = document.createElement("div");

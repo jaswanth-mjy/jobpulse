@@ -405,6 +405,18 @@ def delete_application(app_id):
     return jsonify({"message": "Application deleted!"})
 
 
+@app.route("/api/applications/clear/all", methods=["DELETE"])
+@require_auth
+def clear_all_applications():
+    """Delete all applications for the current user."""
+    db = get_db()
+    result = db.applications.delete_many({"user_id": ObjectId(g.user_id)})
+    return jsonify({
+        "message": f"Deleted {result.deleted_count} applications",
+        "deleted_count": result.deleted_count
+    })
+
+
 # ============================================================
 #  STATS
 # ============================================================
