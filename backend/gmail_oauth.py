@@ -279,33 +279,74 @@ def scan_emails_oauth(creds_dict: dict, days_back: int = 90, max_results: int = 
     # Build search queries for job-related emails
     search_queries = []
     
-    # ATS and company domains
-    ats_domains = [
-        "myworkday.com", "myworkdayjobs.com", "greenhouse.io", "lever.co",
-        "icims.com", "smartrecruiters.com", "taleo.net", "workable.com",
-        "ashbyhq.com", "jobvite.com", "successfactors.com"
+    # TIER 1 + 2: ATS platforms + Company domains (comprehensive list)
+    all_sender_domains = [
+        # ATS platforms (low noise, high signal)
+        "myworkday.com", "myworkdayjobs.com",
+        "greenhouse.io", "lever.co", "icims.com",
+        "smartrecruiters.com", "taleo.net",
+        "successfactors.com", "workable.com", "ashbyhq.com",
+        "jobvite.com",
+        # Banking / Finance
+        "barclays.com", "jpmorgan.com", "jpmorganchase.com",
+        "goldmansachs.com", "morganstanley.com", "citi.com",
+        "hsbc.com", "standardchartered.com", "wellsfargo.com",
+        # Indian IT
+        "infosys.com", "tcs.com", "wipro.com", "hcltech.com",
+        "cognizant.com", "ltimindtree.com",
+        "mphasis.com", "hexaware.com", "persistent.com",
+        # Big Tech
+        "google.com", "amazon.com", "microsoft.com", "apple.com",
+        "meta.com", "netflix.com", "salesforce.com", "oracle.com",
+        "adobe.com", "ibm.com", "intel.com", "nvidia.com",
+        # Consulting
+        "accenture.com", "deloitte.com", "ey.com", "kpmg.com", "pwc.com",
+        "capgemini.com",
+        # Other major employers
+        "siemens.com", "cisco.com", "sap.com", "uber.com",
+        "flipkart.com", "freshworks.com", "zoho.com",
+        "amgen.com",
     ]
     
-    company_domains = [
-        "google.com", "amazon.com", "microsoft.com", "apple.com", "meta.com",
-        "netflix.com", "salesforce.com", "oracle.com", "adobe.com", "ibm.com",
-        "linkedin.com", "naukri.com", "indeed.com", "glassdoor.com"
-    ]
-    
+    print(f"  🔍 Searching {len(all_sender_domains)} company/ATS domains...")
     # Search by sender domain
-    for domain in ats_domains + company_domains:
+    for domain in all_sender_domains:
         search_queries.append(f"from:{domain} after:{since_date}")
     
-    # Search by subject keywords
-    subject_keywords = [
-        "application submitted", "application was sent", "successfully applied",
-        "application confirmation", "thank you for applying",
-        "we received your application", "thank you for your application",
-        "regret to inform", "not been selected", "not moving forward",
-        "interview scheduled", "interview invitation",
-        "assessment invitation", "online assessment", "coding challenge"
+    # TIER 3: Job platforms - TARGETED (sender + subject together)
+    platform_targeted_searches = [
+        ('linkedin.com', 'application'),
+        ('linkedin.com', 'you applied'),
+        ('linkedin.com', 'application was sent'),
+        ('naukri.com', 'successfully applied'),
+        ('naukri.com', 'application confirmation'),
+        ('naukri.com', 'your application for'),
+        ('indeed.com', 'you applied'),
+        ('indeed.com', 'application submitted'),
+        ('glassdoor.com', 'application submitted'),
+        ('wellfound.com', 'application'),
+        ('instahyre.com', 'application'),
+        ('internshala.com', 'applied'),
     ]
     
+    print(f"  🔍 Searching {len(platform_targeted_searches)} platform-targeted queries...")
+    for sender_domain, keyword in platform_targeted_searches:
+        search_queries.append(f'from:{sender_domain} subject:"{keyword}" after:{since_date}')
+    
+    # TIER 4: Subject-only searches (catch from unknown domains)
+    subject_keywords = [
+        "application submitted", "application was sent",
+        "successfully applied", "application confirmation",
+        "thank you for applying", "we received your application",
+        "thank you for your application",
+        "regret to inform", "not been selected",
+        "not moving forward", "after careful consideration",
+        "interview scheduled", "interview invitation",
+        "assessment invitation", "online assessment",
+        "coding challenge",
+    ]
+    
+    print(f"  🔍 Searching {len(subject_keywords)} subject keywords...")
     for keyword in subject_keywords:
         search_queries.append(f'subject:"{keyword}" after:{since_date}')
     
