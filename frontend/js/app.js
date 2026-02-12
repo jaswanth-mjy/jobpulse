@@ -527,10 +527,10 @@ function renderRecentTable() {
     tbody.innerHTML = recent.map((app) => {
         const isUpdated = recentlyUpdatedIds.has(app.id);
         const isNew = recentlyImportedIds.has(app.id);
-        const rowStyle = isUpdated ? 'background: rgba(245, 158, 11, 0.1); cursor:pointer;' : 
-                         isNew ? 'background: rgba(16, 185, 129, 0.1); cursor:pointer;' : 'cursor:pointer';
-        const updateBadge = isUpdated ? ' <span style="color:#f59e0b;font-size:0.75em">↻ Updated</span>' : 
-                           isNew ? ' <span style="color:#10b981;font-size:0.75em">✓ New</span>' : '';
+        const rowStyle = isUpdated ? 'background: rgba(245, 158, 11, 0.08); cursor:pointer; transition: all 0.3s ease;' : 
+                         isNew ? 'background: rgba(16, 185, 129, 0.08); cursor:pointer; transition: all 0.3s ease;' : 'cursor:pointer; transition: all 0.3s ease;';
+        const updateBadge = isUpdated ? ' <span class="update-badge updated"><i class="fas fa-sync-alt"></i>Updated</span>' : 
+                           isNew ? ' <span class="update-badge new"><i class="fas fa-check-circle"></i>New</span>' : '';
         return `
         <tr style="${rowStyle}" onclick="viewApplication('${app.id}')">
             <td class="company-cell">${esc(app.company)}</td>
@@ -558,10 +558,10 @@ function renderApplicationsTable() {
     tbody.innerHTML = allApplications.map((app) => {
         const isUpdated = recentlyUpdatedIds.has(app.id);
         const isNew = recentlyImportedIds.has(app.id);
-        const rowStyle = isUpdated ? 'background: rgba(245, 158, 11, 0.1);' : 
-                         isNew ? 'background: rgba(16, 185, 129, 0.1);' : '';
-        const updateBadge = isUpdated ? ' <span style="color:#f59e0b;font-size:0.75em;font-weight:600">↻ Updated</span>' : 
-                           isNew ? ' <span style="color:#10b981;font-size:0.75em;font-weight:600">✓ New</span>' : '';
+        const rowStyle = isUpdated ? 'background: rgba(245, 158, 11, 0.08); transition: all 0.3s ease;' : 
+                         isNew ? 'background: rgba(16, 185, 129, 0.08); transition: all 0.3s ease;' : 'transition: all 0.3s ease;';
+        const updateBadge = isUpdated ? ' <span class="update-badge updated"><i class="fas fa-sync-alt"></i>Updated</span>' : 
+                           isNew ? ' <span class="update-badge new"><i class="fas fa-check-circle"></i>New</span>' : '';
         return `
         <tr style="${rowStyle}">
             <td class="company-cell">${esc(app.company)}</td>
