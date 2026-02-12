@@ -1493,28 +1493,108 @@ body {
 .modal-detail-value a:hover { text-decoration: underline; }
 
 /* ==========================================
-   TOAST
+   TOAST NOTIFICATIONS
    ========================================== */
-.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
+.toast-container { 
+    position: fixed; 
+    bottom: 24px; 
+    right: 24px; 
+    z-index: 300; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px;
+    max-width: 420px;
+}
+
 .toast {
-    background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
-    padding: 14px 20px; display: flex; align-items: center; gap: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); animation: slideIn 0.3s ease; min-width: 300px;
-}
-.toast.success { border-left: 3px solid var(--accent-green); }
-.toast.error { border-left: 3px solid var(--accent-red); }
-.toast.info { border-left: 3px solid var(--accent-blue); }
-.toast i { font-size: 1.1rem; }
-.toast.success i { color: var(--accent-green); }
-.toast.error i { color: var(--accent-red); }
-.toast.info i { color: var(--accent-blue); }
-
-@keyframes slideIn {
-    from { opacity: 0; transform: translateX(40px); }
-    to { opacity: 1; transform: translateX(0); }
+    background: var(--bg-card); 
+    border: 1px solid var(--border-color); 
+    border-radius: var(--radius);
+    padding: 16px 20px; 
+    display: flex; 
+    align-items: center; 
+    gap: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05); 
+    animation: slideInToast 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 320px;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
 }
 
-/* ==========================================
+.toast::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+
+.toast.success { 
+    background: linear-gradient(135deg, var(--bg-card), rgba(16, 185, 129, 0.05));
+    border-color: rgba(16, 185, 129, 0.3);
+}
+.toast.success::before { background: var(--accent-green); }
+.toast.success i { 
+    color: var(--accent-green); 
+    font-size: 1.2rem;
+    filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.4));
+}
+
+.toast.error { 
+    background: linear-gradient(135deg, var(--bg-card), rgba(239, 68, 68, 0.05));
+    border-color: rgba(239, 68, 68, 0.3);
+}
+.toast.error::before { background: var(--accent-red); }
+.toast.error i { 
+    color: var(--accent-red); 
+    font-size: 1.2rem;
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+}
+
+.toast.info { 
+    background: linear-gradient(135deg, var(--bg-card), rgba(59, 130, 246, 0.05));
+    border-color: rgba(59, 130, 246, 0.3);
+}
+.toast.info::before { background: var(--accent-blue); }
+.toast.info i { 
+    color: var(--accent-blue); 
+    font-size: 1.2rem;
+    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
+}
+
+.toast.warning { 
+    background: linear-gradient(135deg, var(--bg-card), rgba(245, 158, 11, 0.05));
+    border-color: rgba(245, 158, 11, 0.3);
+}
+.toast.warning::before { background: var(--accent-yellow); }
+.toast.warning i { 
+    color: var(--accent-yellow); 
+    font-size: 1.2rem;
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.4));
+}
+
+.toast span {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+@keyframes slideInToast {
+    from { 
+        opacity: 0; 
+        transform: translateX(100px) scale(0.9);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* ==========================================\n   ALERT COMPONENTS\n   ========================================== */\n.alert {\n    padding: 16px 20px;\n    border-radius: var(--radius);\n    border: 1px solid;\n    display: flex;\n    align-items: flex-start;\n    gap: 14px;\n    margin-bottom: 20px;\n    animation: fadeInAlert 0.3s ease;\n    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);\n}\n\n.alert-icon {\n    font-size: 1.3rem;\n    flex-shrink: 0;\n    margin-top: 2px;\n}\n\n.alert-content {\n    flex: 1;\n}\n\n.alert-title {\n    font-weight: 700;\n    font-size: 0.95rem;\n    margin-bottom: 6px;\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n\n.alert-message {\n    font-size: 0.9rem;\n    line-height: 1.6;\n    opacity: 0.9;\n}\n\n/* Alert Variants */\n.alert-success {\n    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));\n    border-color: rgba(16, 185, 129, 0.3);\n    color: var(--text-primary);\n}\n.alert-success .alert-icon {\n    color: var(--accent-green);\n}\n.alert-success .alert-title {\n    color: var(--accent-green);\n}\n\n.alert-error {\n    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));\n    border-color: rgba(239, 68, 68, 0.3);\n    color: var(--text-primary);\n}\n.alert-error .alert-icon {\n    color: var(--accent-red);\n}\n.alert-error .alert-title {\n    color: var(--accent-red);\n}\n\n.alert-warning {\n    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));\n    border-color: rgba(245, 158, 11, 0.3);\n    color: var(--text-primary);\n}\n.alert-warning .alert-icon {\n    color: var(--accent-yellow);\n}\n.alert-warning .alert-title {\n    color: var(--accent-yellow);\n}\n\n.alert-info {\n    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));\n    border-color: rgba(59, 130, 246, 0.3);\n    color: var(--text-primary);\n}\n.alert-info .alert-icon {\n    color: var(--accent-blue);\n}\n.alert-info .alert-title {\n    color: var(--accent-blue);\n}\n\n@keyframes fadeInAlert {\n    from { \n        opacity: 0; \n        transform: translateY(-10px);\n    }\n    to { \n        opacity: 1; \n        transform: translateY(0);\n    }\n}\n\n/* ==========================================\n   CONFIRMATION DIALOG\n   ========================================== */\n.confirm-dialog {\n    position: fixed;\n    inset: 0;\n    background: rgba(0, 0, 0, 0.75);\n    backdrop-filter: blur(8px);\n    display: none;\n    align-items: center;\n    justify-content: center;\n    z-index: 400;\n    animation: fadeIn 0.2s ease;\n}\n\n.confirm-dialog.active {\n    display: flex;\n}\n\n.confirm-dialog-content {\n    background: var(--bg-card);\n    border: 1px solid var(--border-color);\n    border-radius: var(--radius);\n    padding: 32px;\n    max-width: 500px;\n    width: 90%;\n    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);\n    animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n}\n\n.confirm-dialog-icon {\n    width: 64px;\n    height: 64px;\n    border-radius: 50%;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    font-size: 2rem;\n    margin: 0 auto 20px;\n}\n\n.confirm-dialog-icon.danger {\n    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));\n    color: var(--accent-red);\n    border: 2px solid rgba(239, 68, 68, 0.3);\n}\n\n.confirm-dialog-icon.warning {\n    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1));\n    color: var(--accent-yellow);\n    border: 2px solid rgba(245, 158, 11, 0.3);\n}\n\n.confirm-dialog-title {\n    font-size: 1.4rem;\n    font-weight: 700;\n    text-align: center;\n    margin-bottom: 12px;\n    color: var(--text-primary);\n}\n\n.confirm-dialog-message {\n    font-size: 0.95rem;\n    line-height: 1.6;\n    text-align: center;\n    color: var(--text-secondary);\n    margin-bottom: 24px;\n}\n\n.confirm-dialog-actions {\n    display: flex;\n    gap: 12px;\n    justify-content: center;\n}\n\n@keyframes scaleIn {\n    from { \n        opacity: 0; \n        transform: scale(0.9);\n    }\n    to { \n        opacity: 1; \n        transform: scale(1);\n    }\n}\n\n/* ==========================================
    EMPTY STATE
    ========================================== */
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }

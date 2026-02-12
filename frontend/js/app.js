@@ -831,13 +831,53 @@ function platformBadge(platform) {
 
 // ========== TOAST ==========
 function showToast(message, type = "info") {
-    const icons = { success: "fa-check-circle", error: "fa-exclamation-circle", info: "fa-info-circle" };
+    const icons = { 
+        success: "fa-check-circle", 
+        error: "fa-exclamation-circle", 
+        info: "fa-info-circle",
+        warning: "fa-exclamation-triangle"
+    };
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.innerHTML = `<i class="fas ${icons[type]}"></i><span>${message}</span>`;
     $("#toastContainer").appendChild(toast);
 
     setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(100px) scale(0.9)";
+        toast.style.transition = "all 0.3s ease";
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+// ========== ALERT HELPER ==========
+function showAlert(title, message, type = "info", containerId = null) {
+    const icons = {
+        success: "fa-check-circle",
+        error: "fa-times-circle",
+        warning: "fa-exclamation-triangle",
+        info: "fa-info-circle"
+    };
+    
+    const alert = document.createElement("div");
+    alert.className = `alert alert-${type}`;
+    alert.innerHTML = `
+        <i class="fas ${icons[type]} alert-icon"></i>
+        <div class="alert-content">
+            <div class="alert-title">${title}</div>
+            <div class="alert-message">${message}</div>
+        </div>
+    `;
+    
+    if (containerId) {
+        const container = $(containerId);
+        if (container) {
+            container.insertBefore(alert, container.firstChild);
+        }
+    }
+    
+    return alert;
+}
         toast.style.opacity = "0";
         toast.style.transform = "translateX(40px)";
         toast.style.transition = "all 0.3s ease";
