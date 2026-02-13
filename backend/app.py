@@ -422,6 +422,9 @@ def auth_me():
             "id": str(user["_id"]),
             "name": user["name"],
             "email": user["email"],
+            "email_verified": user.get("email_verified", False),
+            "created_at": user.get("created_at", ""),
+            "email_verified_at": user.get("email_verified_at", ""),
         }
     })
 

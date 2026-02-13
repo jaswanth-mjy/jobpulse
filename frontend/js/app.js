@@ -442,7 +442,17 @@ async function showProfileSettings() {
                 }
                 
                 // Show created date if available
-                // For now, just leave as is since we don't have created_at field in response
+                if (data.user.created_at) {
+                    const createdDate = new Date(data.user.created_at);
+                    const formatted = createdDate.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    });
+                    $("#profileCreatedAt").textContent = formatted;
+                } else {
+                    $("#profileCreatedAt").textContent = "N/A";
+                }
             }
         } catch (err) {
             console.error("Failed to load profile data:", err);
