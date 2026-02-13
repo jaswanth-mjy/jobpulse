@@ -34,7 +34,18 @@ function getAuthHeaders() {
 
 function authFetch(url, options = {}) {
     options.headers = { ...options.headers, ...getAuthHeaders() };
-    return fetch(url, options);
+    return fetch(url, options).then(async (response) => {
+        // If 403 (Forbidden) - email verification required
+        if (response.status === 403) {
+            const data = await response.json();
+            if (data.error && data.error.includes("verification")) {
+                console.warn("⚠️ Email verification required - showing verification modal");
+                showVerification(currentUser?.email || g.user_email);
+                showToast("📧 Please verify your email to continue", "warning");
+            }
+        }
+        return response;
+    });
 }
 
 // ========== INIT ==========
@@ -54,9 +65,19 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (res.ok) {
                 const data = await res.json();
                 currentUser = data.user;
-                showApp();
-                // Auto-scan on page load if Gmail connected
-                triggerAutoScanIfConnected();
+                
+                // Check if email verification is pending
+                if (data.pending_verification) {
+                    console.log("⚠️ Email verification pending - showing verification modal");
+                    showLanding(); // Keep landing page visible in background
+                    showVerification(currentUser.email);
+                    showToast("📧 Please verify your email to access the dashboard", "warning");
+                } else {
+                    console.log("✅ Email verified - showing app");
+                    showApp();
+                    // Auto-scan on page load if Gmail connected
+                    triggerAutoScanIfConnected();
+                }
             } else {
                 clearAuth();
                 showLanding();
@@ -351,6 +372,8 @@ function showVerification(email) {
 }
 
 function hideVerification() {
+    // Only hide if user is verified - prevent bypassing verification
+    console.log("⚠️ Attempting to hide verification modal");
     $("#verificationOverlay").classList.remove("active");
 }
 

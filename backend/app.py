@@ -106,11 +106,22 @@ def require_auth(f):
             payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             g.user_id = payload["user_id"]
             g.user_email = payload.get("email", "")
+            g.verified = payload.get("verified", False)
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired. Please sign in again."}), 401
         except jwt.InvalidTokenError:
             return jsonify({"error": "Invalid token"}), 401
 
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_verified_email(f):
+    """Decorator — require verified email (use after @require_auth)."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not g.get("verified", False):
+            return jsonify({"error": "Email verification required"}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -512,6 +523,7 @@ def create_application():
 
 @app.route("/api/applications", methods=["GET"])
 @require_auth
+@require_verified_email
 def get_applications():
     db = get_db()
 
@@ -545,6 +557,7 @@ def get_applications():
 
 @app.route("/api/applications/<app_id>", methods=["GET"])
 @require_auth
+@require_verified_email
 def get_application(app_id):
     db = get_db()
     doc = db.applications.find_one({"_id": ObjectId(app_id), "user_id": ObjectId(g.user_id)})
@@ -555,6 +568,7 @@ def get_application(app_id):
 
 @app.route("/api/applications/<app_id>", methods=["PUT"])
 @require_auth
+@require_verified_email
 def update_application(app_id):
     data = request.get_json()
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -587,6 +601,7 @@ def update_application(app_id):
 
 @app.route("/api/applications/<app_id>", methods=["DELETE"])
 @require_auth
+@require_verified_email
 def delete_application(app_id):
     db = get_db()
     result = db.applications.delete_one({"_id": ObjectId(app_id), "user_id": ObjectId(g.user_id)})
@@ -597,6 +612,7 @@ def delete_application(app_id):
 
 @app.route("/api/applications/clear/all", methods=["DELETE"])
 @require_auth
+@require_verified_email
 def clear_all_applications():
     """Delete all applications for the current user."""
     db = get_db()
@@ -613,6 +629,7 @@ def clear_all_applications():
 
 @app.route("/api/stats", methods=["GET"])
 @require_auth
+@require_verified_email
 def get_stats():
     db = get_db()
     user_filter = {"user_id": ObjectId(g.user_id)}
@@ -659,6 +676,7 @@ def get_stats():
 
 @app.route("/api/gmail/accounts", methods=["GET"])
 @require_auth
+@require_verified_email
 def gmail_accounts():
     try:
         db = get_db()
@@ -677,6 +695,7 @@ def gmail_accounts():
 
 @app.route("/api/gmail/accounts", methods=["POST"])
 @require_auth
+@require_verified_email
 def gmail_add_account():
     try:
         from gmail_service import test_connection
@@ -715,6 +734,7 @@ def gmail_add_account():
 
 @app.route("/api/gmail/accounts/<account_id>", methods=["DELETE"])
 @require_auth
+@require_verified_email
 def gmail_remove_account(account_id):
     db = get_db()
     result = db.gmail_config.delete_one({"_id": ObjectId(account_id), "user_id": ObjectId(g.user_id)})
@@ -725,6 +745,7 @@ def gmail_remove_account(account_id):
 
 @app.route("/api/gmail/status", methods=["GET"])
 @require_auth
+@require_verified_email
 def gmail_status():
     db = get_db()
     accounts = list(db.gmail_config.find({"user_id": ObjectId(g.user_id)}))
@@ -738,6 +759,7 @@ def gmail_status():
 
 @app.route("/api/gmail/scan", methods=["POST"])
 @require_auth
+@require_verified_email
 def gmail_scan():
     try:
         from gmail_service import scan_emails_for_account
@@ -1081,6 +1103,7 @@ def _trigger_background_scan(user_id: str):
 
 @app.route("/api/scan/status", methods=["GET"])
 @require_auth
+@require_verified_email
 def scan_status():
     """Check the status of a background scan triggered on login."""
     status = _scan_status.get(g.user_id, {"status": "idle", "result": None})
@@ -1107,6 +1130,7 @@ def gmail_oauth_status():
 
 @app.route("/api/gmail/oauth/start", methods=["POST"])
 @require_auth
+@require_verified_email
 def gmail_oauth_start():
     """Start the OAuth 2.0 flow - returns authorization URL."""
     try:
@@ -1265,6 +1289,7 @@ def gmail_oauth_callback():
 
 @app.route("/api/gmail/oauth/accounts", methods=["GET"])
 @require_auth
+@require_verified_email
 def gmail_oauth_accounts():
     """List all connected Gmail accounts (both OAuth and App Password)."""
     try:
