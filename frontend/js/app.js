@@ -94,10 +94,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 
                 // Check if email needs verification (only for unverified password users)
                 if (!data.user.email_verified) {
-                    console.log("⚠️ Email not verified - prompting verification");
+                    console.log("⚠️ Email not verified - showing verification modal");
                     showLanding(); // Keep landing page visible in background
-                    // Request verification code
-                    await requestVerificationCode(currentUser.email);
                     showVerification(currentUser.email);
                     showToast("📧 Please verify your email to access the dashboard", "warning");
                 } else {

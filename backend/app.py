@@ -198,7 +198,7 @@ def signup():
     return jsonify({
         "message": "Account created! Please verify your email.",
         "token": temp_token,
-        "user": {"id": user_id, "name": name, "email": email_addr},
+        "user": {"id": user_id, "name": name, "email": email_addr, "email_verified": False},
         "pending_verification": True,
         "email_sent": email_sent,
     }), 201
@@ -253,7 +253,7 @@ def signin():
         return jsonify({
             "message": "Signed in successfully",
             "token": token,
-            "user": {"id": user_id, "name": user["name"], "email": email_addr},
+            "user": {"id": user_id, "name": user["name"], "email": email_addr, "email_verified": True},
             "pending_verification": False,
         })
     
@@ -295,7 +295,7 @@ def signin():
     return jsonify({
         "message": "Verification code sent to your email",
         "token": temp_token,
-        "user": {"id": user_id, "name": user["name"], "email": email_addr},
+        "user": {"id": user_id, "name": user["name"], "email": email_addr, "email_verified": False},
         "pending_verification": True,
         "email_sent": email_sent,
     })
@@ -398,7 +398,7 @@ def google_auth():
         return jsonify({
             "message": "Signed in with Google!",
             "token": token,
-            "user": {"id": user_id, "name": name, "email": google_email},
+            "user": {"id": user_id, "name": name, "email": google_email, "email_verified": True},
             "gmail_connected": gmail_connected,
             "auto_scan": gmail_connected,
         })
