@@ -851,6 +851,206 @@ def clear_all_applications():
     })
 
 
+@app.route("/api/applications/export", methods=["GET"])
+@require_auth
+@require_verified_email
+def export_applications():
+    """Export all applications for the current user as JSON or CSV."""
+    db = get_db()
+    format_type = request.args.get("format", "json").lower()
+    
+    # Fetch all applications
+    applications = list(db.applications.find({"user_id": ObjectId(g.user_id)}).sort("applied_date", -1))
+    
+    if not applications:
+        return jsonify({"error": "No applications to export"}), 404
+    
+    if format_type == "csv":
+        import csv
+        from io import StringIO
+        
+        output = StringIO()
+        fieldnames = ["company", "role", "platform", "status", "salary", "location", 
+                      "job_url", "notes", "applied_date", "interview_date", "response_date"]
+        
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        for app in applications:
+            row = {
+                "company": app.get("company", ""),
+                "role": app.get("role", ""),
+                "platform": app.get("platform", ""),
+                "status": app.get("status", ""),
+                "salary": app.get("salary", ""),
+                "location": app.get("location", ""),
+                "job_url": app.get("job_url", ""),
+                "notes": app.get("notes", ""),
+                "applied_date": app.get("applied_date", ""),
+                "interview_date": app.get("interview_date", ""),
+                "response_date": app.get("response_date", ""),
+            }
+            writer.writerow(row)
+        
+        from flask import Response
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=jobpulse_export_{date.today().isoformat()}.csv"}
+        )
+    else:
+        # JSON export
+        export_data = []
+        for app in applications:
+            export_data.append({
+                "company": app.get("company", ""),
+                "role": app.get("role", ""),
+                "platform": app.get("platform", ""),
+                "status": app.get("status", ""),
+                "salary": app.get("salary", ""),
+                "location": app.get("location", ""),
+                "job_url": app.get("job_url", ""),
+                "notes": app.get("notes", ""),
+                "applied_date": app.get("applied_date", ""),
+                "interview_date": app.get("interview_date", ""),
+                "response_date": app.get("response_date", ""),
+                "status_history": app.get("status_history", []),
+            })
+        
+        from flask import Response
+        return Response(
+            json.dumps({"applications": export_data, "exported_at": datetime.utcnow().isoformat(), "count": len(export_data)}, indent=2),
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename=jobpulse_export_{date.today().isoformat()}.json"}
+        )
+
+
+@app.route("/api/applications/import", methods=["POST"])
+@require_auth
+@require_verified_email
+def import_applications():
+    """Import applications from JSON or CSV file."""
+    db = get_db()
+    
+    # Handle JSON data
+    if request.is_json:
+        data = request.get_json()
+        applications = data.get("applications", [])
+        
+        if not isinstance(applications, list):
+            applications = [data]  # Single application object
+    else:
+        # Handle file upload (CSV or JSON)
+        if "file" not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "Empty filename"}), 400
+        
+        file_content = file.read().decode("utf-8")
+        
+        if file.filename.endswith(".json"):
+            file_data = json.loads(file_content)
+            applications = file_data.get("applications", file_data if isinstance(file_data, list) else [file_data])
+        elif file.filename.endswith(".csv"):
+            import csv
+            from io import StringIO
+            
+            csv_reader = csv.DictReader(StringIO(file_content))
+            applications = list(csv_reader)
+        else:
+            return jsonify({"error": "Unsupported file format. Use JSON or CSV."}), 400
+    
+    if not applications:
+        return jsonify({"error": "No applications found in import data"}), 400
+    
+    # Validate and import
+    imported = 0
+    updated = 0
+    skipped = 0
+    errors = []
+    
+    for idx, app_data in enumerate(applications):
+        try:
+            # Validate required fields
+            if not app_data.get("company") or not app_data.get("role"):
+                errors.append(f"Row {idx + 1}: Missing company or role")
+                skipped += 1
+                continue
+            
+            # Check for duplicates
+            existing = db.applications.find_one({
+                "user_id": ObjectId(g.user_id),
+                "company": app_data["company"],
+                "role": app_data["role"],
+                "applied_date": app_data.get("applied_date", ""),
+            })
+            
+            if existing:
+                # Update existing if status is different
+                if app_data.get("status") and app_data["status"] != existing.get("status"):
+                    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                    status_history = existing.get("status_history", [])
+                    status_history.append({
+                        "status": app_data["status"],
+                        "date": now,
+                        "source": "import"
+                    })
+                    
+                    update_fields = {
+                        "status": app_data["status"],
+                        "updated_date": now,
+                        "status_history": status_history,
+                    }
+                    
+                    # Update other fields if provided
+                    for field in ["platform", "salary", "location", "job_url", "notes", "interview_date", "response_date"]:
+                        if app_data.get(field):
+                            update_fields[field] = app_data[field]
+                    
+                    db.applications.update_one({"_id": existing["_id"]}, {"$set": update_fields})
+                    updated += 1
+                else:
+                    skipped += 1
+            else:
+                # Import as new application
+                now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                initial_status = app_data.get("status", "Applied")
+                
+                new_doc = {
+                    "user_id": ObjectId(g.user_id),
+                    "company": app_data["company"],
+                    "role": app_data["role"],
+                    "platform": app_data.get("platform", "Other"),
+                    "status": initial_status,
+                    "salary": app_data.get("salary", ""),
+                    "location": app_data.get("location", ""),
+                    "job_url": app_data.get("job_url", ""),
+                    "notes": app_data.get("notes", ""),
+                    "applied_date": app_data.get("applied_date", date.today().isoformat()),
+                    "updated_date": now,
+                    "interview_date": app_data.get("interview_date", ""),
+                    "response_date": app_data.get("response_date", ""),
+                    "status_history": app_data.get("status_history", [{"status": initial_status, "date": now, "source": "import"}]),
+                }
+                
+                db.applications.insert_one(new_doc)
+                imported += 1
+                
+        except Exception as e:
+            errors.append(f"Row {idx + 1}: {str(e)}")
+            skipped += 1
+    
+    return jsonify({
+        "message": f"Import complete: {imported} new, {updated} updated, {skipped} skipped",
+        "imported": imported,
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+    })
+
+
 # ============================================================
 #  STATS
 # ============================================================
