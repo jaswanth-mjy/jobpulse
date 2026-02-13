@@ -151,12 +151,15 @@ async function initApp() {
     checkGmailStatus();
     setView("dashboard");
     
-    // Show onboarding guide for first-time users
-    setTimeout(() => {
-        if (typeof showOnboarding === 'function') {
-            showOnboarding(handleOnboardingAction);
-        }
-    }, 800);
+    // Show onboarding guide only for first-time users (never again after skip/complete)
+    const hasCompletedOnboarding = localStorage.getItem('jobpulse_onboarding_completed') === 'true';
+    if (!hasCompletedOnboarding) {
+        setTimeout(() => {
+            if (typeof showOnboarding === 'function') {
+                showOnboarding(handleOnboardingAction);
+            }
+        }, 800);
+    }
 }
 
 // ========== AUTH: Show/Hide Modal ==========

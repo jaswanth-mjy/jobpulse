@@ -76,6 +76,11 @@ class OnboardingGuide {
     skip() {
         this.markCompleted();
         this.hide();
+        
+        // Notify user that tutorial is permanently dismissed
+        if (typeof showToast === 'function') {
+            showToast('Tutorial skipped. You can restart it anytime from Profile Settings.', 'info');
+        }
     }
 
     complete() {
