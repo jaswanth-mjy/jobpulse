@@ -6,6 +6,7 @@
     <title>JobPulse — Smart Job Application Tracker</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/dialog-popup.css">
+    <link rel="stylesheet" href="css/onboarding.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -593,17 +594,33 @@
                     </div>
                 </div>
                 
-                <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid #e5e7eb;">
-                    <h3 style="color: #dc2626; margin-bottom: 15px; font-size: 18px;">
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                    <h3 style="color: #6366f1; margin-bottom: 10px; font-size: 16px;">
+                        <i class="fas fa-graduation-cap"></i> Tutorial & Help
+                    </h3>
+                    <p style="color: #666; font-size: 13px; margin-bottom: 12px;">
+                        Want to see the getting started guide again? Restart the tutorial anytime.
+                    </p>
+                    <button 
+                        class="btn btn-primary" 
+                        onclick="restartOnboardingTutorial()"
+                        style="width: 100%; padding: 10px;"
+                    >
+                        <i class="fas fa-play-circle"></i> Restart Tutorial
+                    </button>
+                </div>
+                
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                    <h3 style="color: #dc2626; margin-bottom: 10px; font-size: 16px;">
                         <i class="fas fa-exclamation-triangle"></i> Danger Zone
                     </h3>
-                    <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
-                        Once you delete your account, there is no going back. All your data will be permanently deleted.
+                    <p style="color: #666; font-size: 13px; margin-bottom: 12px;">
+                        Once you delete your account, there is no going back. All data will be permanently deleted.
                     </p>
                     <button 
                         class="btn btn-danger" 
                         onclick="confirmDeleteAccount()"
-                        style="width: 100%; background: #dc2626; border-color: #dc2626;"
+                        style="width: 100%; background: #dc2626; border-color: #dc2626; padding: 10px;"
                     >
                         <i class="fas fa-trash-alt"></i> Delete Account
                     </button>
@@ -1138,6 +1155,229 @@
         </div>
     </div>
 
+    <!-- ========================================================
+         ONBOARDING GUIDE OVERLAY
+         ======================================================== -->
+    <div class="onboarding-overlay" id="onboardingOverlay">
+        <div class="onboarding-card">
+            <div class="onboarding-header">
+                <button class="onboarding-close" onclick="hideOnboarding()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="onboarding-step-indicator">Step 1 of 5</div>
+                <h2>Welcome to JobPulse! 👋</h2>
+                <p>Your smart job application tracker</p>
+                <div class="onboarding-progress">
+                    <div class="onboarding-progress-bar" style="width: 20%"></div>
+                </div>
+            </div>
+
+            <div class="onboarding-content">
+                
+                <!-- STEP 0: Welcome -->
+                <div class="onboarding-step active" id="onboarding-step-0">
+                    <div class="onboarding-icon">🎯</div>
+                    <h3>Track Your Job Search Like a Pro</h3>
+                    <p class="onboarding-step-description">
+                        JobPulse helps you organize and track all your job applications in one place. 
+                        Let's get you started with a quick tour!
+                    </p>
+                    
+                    <ul class="onboarding-features">
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <span>Auto-import applications from your Gmail</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <span>Track applications across 15+ platforms</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <span>Visualize your job search progress</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <span>Never miss a follow-up or deadline</span>
+                        </li>
+                    </ul>
+
+                    <div class="onboarding-actions">
+                        <button class="btn btn-onboarding-primary" onclick="onboardingGuide.next()">
+                            <span>Get Started</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <button class="btn btn-onboarding-skip" onclick="onboardingGuide.skip()">
+                        Skip tutorial
+                    </button>
+                </div>
+
+                <!-- STEP 1: Add Application -->
+                <div class="onboarding-step" id="onboarding-step-1">
+                    <div class="onboarding-icon">📝</div>
+                    <h3>Add Your First Application</h3>
+                    <p class="onboarding-step-description">
+                        You can manually add job applications at any time. Click 'Next' to continue the tour,
+                        or explore this feature after completing the tutorial.
+                    </p>
+
+                    <ul class="onboarding-features">
+                        <li>
+                            <i class="fas fa-info-circle"></i>
+                            <span>Enter company name, position, and status</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-info-circle"></i>
+                            <span>Add notes, deadlines, and contact details</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-info-circle"></i>
+                            <span>Upload job descriptions or related files</span>
+                        </li>
+                    </ul>
+
+                    <div class="onboarding-actions">
+                        <button class="btn btn-onboarding-secondary" onclick="onboardingGuide.previous()">
+                            <i class="fas fa-arrow-left"></i>
+                            <span>Back</span>
+                        </button>
+                        <button class="btn btn-onboarding-primary" onclick="onboardingGuide.next()">
+                            <span>Next</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <button class="btn btn-onboarding-skip" onclick="onboardingGuide.skip()">
+                        Skip tutorial
+                    </button>
+                </div>
+
+                <!-- STEP 2: Gmail Import -->
+                <div class="onboarding-step" id="onboarding-step-2">
+                    <div class="onboarding-icon">📧</div>
+                    <h3>Auto-Import from Gmail</h3>
+                    <p class="onboarding-step-description">
+                        Connect your Gmail to automatically import job applications from confirmation emails.
+                        You can set this up after the tutorial - just click 'Next' to continue.
+                    </p>
+
+                    <ul class="onboarding-features">
+                        <li>
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Your data stays private and secure</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-magic"></i>
+                            <span>Automatically detect job applications from emails</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-clock"></i>
+                            <span>Save hours of manual data entry</span>
+                        </li>
+                    </ul>
+
+                    <div class="onboarding-actions">
+                        <button class="btn btn-onboarding-secondary" onclick="onboardingGuide.previous()">
+                            <i class="fas fa-arrow-left"></i>
+                            <span>Back</span>
+                        </button>
+                        <button class="btn btn-onboarding-primary" onclick="onboardingGuide.next()">
+                            <span>Next</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <button class="btn btn-onboarding-skip" onclick="onboardingGuide.skip()">
+                        Skip tutorial
+                    </button>
+                </div>
+
+                <!-- STEP 3: Dashboard Tour -->
+                <div class="onboarding-step" id="onboarding-step-3">
+                    <div class="onboarding-icon">📊</div>
+                    <h3>Explore Your Dashboard</h3>
+                    <p class="onboarding-step-description">
+                        Your dashboard shows all your applications at a glance. 
+                        Use filters, search, and sorting to find what you need quickly.
+                    </p>
+
+                    <ul class="onboarding-features">
+                        <li>
+                            <i class="fas fa-chart-pie"></i>
+                            <span><strong>Analytics:</strong> View response rates by platform</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-filter"></i>
+                            <span><strong>Filters:</strong> Sort by status, date, or platform</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-search"></i>
+                            <span><strong>Search:</strong> Quickly find any application</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-edit"></i>
+                            <span><strong>Quick Edit:</strong> Update status with one click</span>
+                        </li>
+                    </ul>
+
+                    <div class="onboarding-actions">
+                        <button class="btn btn-onboarding-secondary" onclick="onboardingGuide.previous()">
+                            <i class="fas fa-arrow-left"></i>
+                            <span>Back</span>
+                        </button>
+                        <button class="btn btn-onboarding-primary" onclick="onboardingGuide.next()">
+                            <span>Next</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <button class="btn btn-onboarding-skip" onclick="onboardingGuide.skip()">
+                        Skip tutorial
+                    </button>
+                </div>
+
+                <!-- STEP 4: Complete -->
+                <div class="onboarding-step" id="onboarding-step-4">
+                    <div class="onboarding-icon">🚀</div>
+                    <h3>You're Ready to Go!</h3>
+                    <p class="onboarding-step-description">
+                        You've completed the quick tour! Start tracking your applications 
+                        and let JobPulse help you land your dream job.
+                    </p>
+
+                    <ul class="onboarding-features">
+                        <li>
+                            <i class="fas fa-lightbulb"></i>
+                            <span><strong>Pro Tip:</strong> Update statuses regularly for accurate analytics</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-bell"></i>
+                            <span><strong>Stay Organized:</strong> Set reminders for follow-ups</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-sync"></i>
+                            <span><strong>Keep It Fresh:</strong> Run Gmail scan weekly</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-question-circle"></i>
+                            <span><strong>Need Help?:</strong> Check settings for tutorials</span>
+                        </li>
+                    </ul>
+
+                    <div class="onboarding-actions">
+                        <button class="btn btn-onboarding-primary" onclick="onboardingGuide.complete()" style="flex: 1;">
+                            <i class="fas fa-check"></i>
+                            <span>Start Tracking</span>
+                        </button>
+                    </div>
+                    <button class="btn btn-onboarding-skip" onclick="onboardingGuide.previous()">
+                        <i class="fas fa-arrow-left"></i> Go Back
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="js/onboarding.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

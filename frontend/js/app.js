@@ -128,12 +128,35 @@ function showApp() {
     initApp();
 }
 
+// ========== ONBOARDING: Handle Actions ==========
+function handleOnboardingAction(action) {
+    switch (action) {
+        case 'add-application':
+            // Show info without hiding tutorial
+            showToast("Click 'Next' to continue or try adding an application!", "info");
+            break;
+        case 'connect-gmail':
+            // Show info without hiding tutorial
+            showToast("Click 'Next' to continue or explore Gmail import!", "info");
+            break;
+        default:
+            console.log("Unknown onboarding action:", action);
+    }
+}
+
 async function initApp() {
     await loadMeta();
     await refreshData();
     setupEventListeners();
     checkGmailStatus();
     setView("dashboard");
+    
+    // Show onboarding guide for first-time users
+    setTimeout(() => {
+        if (typeof showOnboarding === 'function') {
+            showOnboarding(handleOnboardingAction);
+        }
+    }, 800);
 }
 
 // ========== AUTH: Show/Hide Modal ==========
@@ -461,6 +484,21 @@ function hideProfileSettings() {
     $("#profileError").style.display = "none";
 }
 
+function restartOnboardingTutorial() {
+    hideProfileSettings();
+    if (typeof resetOnboarding === 'function') {
+        resetOnboarding();
+        setTimeout(() => {
+            if (typeof showOnboarding === 'function') {
+                showOnboarding(handleOnboardingAction);
+                showToast("Tutorial restarted! Let's go through it again.", "info");
+            }
+        }, 500);
+    } else {
+        showToast("Onboarding feature not available", "error");
+    }
+}
+
 function showProfileError(msg) {
     const el = $("#profileError");
     el.textContent = msg;
@@ -468,46 +506,49 @@ function showProfileError(msg) {
 }
 
 async function confirmDeleteAccount() {
-    const confirmed = confirm(
-        "⚠️ WARNING: This action cannot be undone!\n\n" +
-        "Are you absolutely sure you want to delete your account?\n\n" +
-        "This will permanently delete:\n" +
-        "• All your job applications\n" +
-        "• Your profile information\n" +
-        "• All connected Gmail accounts\n" +
-        "• All your data\n\n" +
-        "Type 'DELETE' in the next prompt to confirm."
-    );
+    // First close the profile settings modal
+    hideProfileSettings();
     
-    if (!confirmed) return;
-    
-    const confirmation = prompt('Please type "DELETE" to confirm account deletion:');
-    
-    if (confirmation !== "DELETE") {
-        showToast("Account deletion cancelled", "info");
-        return;
-    }
-    
-    try {
-        const res = await authFetch(`${API}/auth/delete-account`, {
-            method: "DELETE",
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-            showToast("Account deleted successfully", "success");
-            hideProfileSettings();
-            
-            // Sign out after 2 seconds
-            setTimeout(() => {
-                handleLogout();
-            }, 2000);
-        } else {
-            showProfileError(data.error || "Failed to delete account");
-        }
-    } catch (err) {
-        showProfileError("Network error. Please try again.");
-    }
+    // Small delay to let the profile modal close animation complete
+    setTimeout(() => {
+        showConfirmDialog(
+            "⚠️ Delete Account",
+            `<strong>WARNING: This action cannot be undone!</strong><br><br>
+            This will permanently delete:<br>
+            • All your job applications<br>
+            • Your profile information<br>
+            • All connected Gmail accounts<br>
+            • All your data<br><br>
+            <span style="color: var(--accent-red); font-weight: 600;">
+            This action is irreversible and immediate.
+            </span>`,
+            "DELETE",
+            async () => {
+                try {
+                    const res = await authFetch(`${API}/auth/delete-account`, {
+                        method: "DELETE",
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        showToast("Account deleted successfully", "success");
+                        
+                        // Sign out after 2 seconds
+                        setTimeout(() => {
+                            handleLogout();
+                        }, 2000);
+                    } else {
+                        showProfileError(data.error || "Failed to delete account");
+                    }
+                } catch (err) {
+                    showProfileError("Network error. Please try again.");
+                }
+            },
+            () => {
+                showToast("Account deletion cancelled", "info");
+            }
+        );
+    }, 100);
 }
 
 // ========== EMAIL VERIFICATION ==========
