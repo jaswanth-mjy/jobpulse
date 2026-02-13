@@ -554,6 +554,68 @@
 
 
     <!-- ========================================================
+         PROFILE SETTINGS MODAL
+         ======================================================== -->
+    <div class="auth-overlay" id="profileSettingsOverlay">
+        <div class="auth-modal" style="max-width: 500px;">
+            <button class="auth-close" onclick="hideProfileSettings()"><i class="fas fa-times"></i></button>
+            
+            <div class="auth-form-container">
+                <div class="auth-header">
+                    <i class="fas fa-user-cog auth-logo-icon" style="color: #6366f1;"></i>
+                    <h2>Profile Settings</h2>
+                    <p>Manage your account information</p>
+                </div>
+                
+                <div class="profile-info-section">
+                    <div class="profile-info-item">
+                        <label><i class="fas fa-user"></i> Full Name</label>
+                        <div class="profile-info-value" id="profileName">Loading...</div>
+                    </div>
+                    
+                    <div class="profile-info-item">
+                        <label><i class="fas fa-envelope"></i> Email Address</label>
+                        <div class="profile-info-value" id="profileEmail">Loading...</div>
+                    </div>
+                    
+                    <div class="profile-info-item">
+                        <label><i class="fas fa-shield-alt"></i> Email Verification</label>
+                        <div class="profile-info-value" id="profileVerified">
+                            <span class="badge badge-success">
+                                <i class="fas fa-check-circle"></i> Verified
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-info-item">
+                        <label><i class="fas fa-calendar-alt"></i> Member Since</label>
+                        <div class="profile-info-value" id="profileCreatedAt">Loading...</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid #e5e7eb;">
+                    <h3 style="color: #dc2626; margin-bottom: 15px; font-size: 18px;">
+                        <i class="fas fa-exclamation-triangle"></i> Danger Zone
+                    </h3>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                        Once you delete your account, there is no going back. All your data will be permanently deleted.
+                    </p>
+                    <button 
+                        class="btn btn-danger" 
+                        onclick="confirmDeleteAccount()"
+                        style="width: 100%; background: #dc2626; border-color: #dc2626;"
+                    >
+                        <i class="fas fa-trash-alt"></i> Delete Account
+                    </button>
+                </div>
+                
+                <div class="auth-error" id="profileError" style="display:none; margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ========================================================
          APP (Dashboard — visible after login)
          ======================================================== -->
     <div id="appContainer" style="display:none;">
@@ -579,13 +641,26 @@
                 </a>
             </nav>
             <div class="sidebar-footer">
-                <div class="user-info" id="userInfo">
-                    <i class="fas fa-user-circle"></i>
-                    <span id="userName">User</span>
+                <div class="user-profile-section">
+                    <div class="user-info" id="userInfo" onclick="toggleProfileMenu()">
+                        <div class="user-avatar">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <div class="user-details">
+                            <span id="userName" class="user-name">User</span>
+                            <span id="userEmail" class="user-email">user@example.com</span>
+                        </div>
+                        <i class="fas fa-chevron-up" id="profileMenuIcon"></i>
+                    </div>
+                    <div class="profile-dropdown" id="profileDropdown" style="display: none;">
+                        <a href="#" class="dropdown-item" onclick="showProfileSettings(); return false;">
+                            <i class="fas fa-user-cog"></i> Profile Settings
+                        </a>
+                        <a href="#" class="dropdown-item" onclick="handleLogout(); return false;">
+                            <i class="fas fa-sign-out-alt"></i> Sign Out
+                        </a>
+                    </div>
                 </div>
-                <button class="btn btn-ghost btn-sm" id="logoutBtn" onclick="handleLogout()">
-                    <i class="fas fa-sign-out-alt"></i> Sign Out
-                </button>
             </div>
         </aside>
 

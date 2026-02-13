@@ -600,6 +600,35 @@ def reset_password():
     })
 
 
+@app.route("/api/auth/delete-account", methods=["DELETE"])
+@require_auth
+def delete_account():
+    """Permanently delete user account and all associated data"""
+    db = get_db()
+    user_id = ObjectId(g.user_id)
+    
+    try:
+        # Delete all user data
+        db.applications.delete_many({"user_id": user_id})
+        db.gmail_config.delete_many({"user_id": user_id})
+        db.email_verifications.delete_many({"user_id": user_id})
+        db.password_resets.delete_many({"user_id": user_id})
+        
+        # Finally delete the user
+        result = db.users.delete_one({"_id": user_id})
+        
+        if result.deleted_count == 0:
+            return jsonify({"error": "User not found"}), 404
+        
+        return jsonify({
+            "message": "Account deleted successfully",
+            "success": True
+        })
+    except Exception as e:
+        print(f"Error deleting account: {e}")
+        return jsonify({"error": "Failed to delete account"}), 500
+
+
 # ============================================================
 #  METADATA
 # ============================================================

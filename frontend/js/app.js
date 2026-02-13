@@ -103,6 +103,7 @@ function showApp() {
     // Update user info in sidebar
     if (currentUser) {
         $("#userName").textContent = currentUser.name || currentUser.email;
+        $("#userEmail").textContent = currentUser.email;
     }
 
     initApp();
@@ -345,6 +346,108 @@ function clearAuth() {
     currentUser = null;
     localStorage.removeItem("jobpulse_token");
     localStorage.removeItem("jobpulse_user");
+}
+
+// ========== PROFILE SETTINGS ==========
+function toggleProfileMenu() {
+    const dropdown = $("#profileDropdown");
+    const icon = $("#profileMenuIcon");
+    
+    if (dropdown.style.display === "none") {
+        dropdown.style.display = "block";
+        icon.classList.add("rotated");
+    } else {
+        dropdown.style.display = "none";
+        icon.classList.remove("rotated");
+    }
+}
+
+async function showProfileSettings() {
+    const overlay = $("#profileSettingsOverlay");
+    overlay.classList.add("active");
+    
+    // Hide profile dropdown
+    $("#profileDropdown").style.display = "none";
+    $("#profileMenuIcon").classList.remove("rotated");
+    
+    // Load user data
+    if (currentUser) {
+        $("#profileName").textContent = currentUser.name || "N/A";
+        $("#profileEmail").textContent = currentUser.email || "N/A";
+        
+        try {
+            const res = await authFetch(`${API}/auth/me`);
+            if (res.ok) {
+                const data = await res.json();
+                
+                // Update verification status
+                if (data.user.email_verified || data.verified) {
+                    $("#profileVerified").innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Verified</span>';
+                } else {
+                    $("#profileVerified").innerHTML = '<span class="badge" style="background: #fff3cd; color: #856404;"><i class="fas fa-exclamation-triangle"></i> Not Verified</span>';
+                }
+                
+                // Show created date if available
+                // For now, just leave as is since we don't have created_at field in response
+            }
+        } catch (err) {
+            console.error("Failed to load profile data:", err);
+        }
+    }
+}
+
+function hideProfileSettings() {
+    $("#profileSettingsOverlay").classList.remove("active");
+    $("#profileError").style.display = "none";
+}
+
+function showProfileError(msg) {
+    const el = $("#profileError");
+    el.textContent = msg;
+    el.style.display = "block";
+}
+
+async function confirmDeleteAccount() {
+    const confirmed = confirm(
+        "⚠️ WARNING: This action cannot be undone!\n\n" +
+        "Are you absolutely sure you want to delete your account?\n\n" +
+        "This will permanently delete:\n" +
+        "• All your job applications\n" +
+        "• Your profile information\n" +
+        "• All connected Gmail accounts\n" +
+        "• All your data\n\n" +
+        "Type 'DELETE' in the next prompt to confirm."
+    );
+    
+    if (!confirmed) return;
+    
+    const confirmation = prompt('Please type "DELETE" to confirm account deletion:');
+    
+    if (confirmation !== "DELETE") {
+        showToast("Account deletion cancelled", "info");
+        return;
+    }
+    
+    try {
+        const res = await authFetch(`${API}/auth/delete-account`, {
+            method: "DELETE",
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast("Account deleted successfully", "success");
+            hideProfileSettings();
+            
+            // Sign out after 2 seconds
+            setTimeout(() => {
+                handleLogout();
+            }, 2000);
+        } else {
+            showProfileError(data.error || "Failed to delete account");
+        }
+    } catch (err) {
+        showProfileError("Network error. Please try again.");
+    }
 }
 
 // ========== EMAIL VERIFICATION ==========
