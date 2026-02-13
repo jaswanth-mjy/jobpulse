@@ -235,11 +235,25 @@ def signin():
     
     if email_already_verified is None:
         # Legacy user without email_verified field - auto-verify them
+        update_fields = {
+            "email_verified": True, 
+            "email_verified_at": datetime.utcnow()
+        }
+        # Also ensure created_at exists for legacy users
+        if not user.get("created_at"):
+            update_fields["created_at"] = datetime.utcnow().isoformat()
+        
         db.users.update_one(
             {"_id": user["_id"]},
-            {"$set": {"email_verified": True, "email_verified_at": datetime.utcnow()}}
+            {"$set": update_fields}
         )
         email_already_verified = True
+    elif not user.get("created_at"):
+        # Ensure created_at exists for verified users
+        db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"created_at": datetime.utcnow().isoformat()}}
+        )
     
     if email_already_verified:
         # User already verified - direct login
@@ -365,7 +379,18 @@ def google_auth():
             if not user.get("email_verified"):
                 db.users.update_one(
                     {"_id": user["_id"]},
-                    {"$set": {"email_verified": True, "email_verified_at": datetime.utcnow()}}
+                    {"$set": {
+                        "email_verified": True, 
+                        "email_verified_at": datetime.utcnow(),
+                        "auth_provider": "google"
+                    }}
+                )
+            
+            # Ensure created_at exists (backward compatibility)
+            if not user.get("created_at"):
+                db.users.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"created_at": datetime.utcnow().isoformat()}}
                 )
         else:
             # New user — create account (no password needed for Google users)
@@ -417,14 +442,24 @@ def auth_me():
     user = db.users.find_one({"_id": ObjectId(g.user_id)})
     if not user:
         return jsonify({"error": "User not found"}), 404
+    
+    # Convert datetime objects to ISO strings
+    created_at = user.get("created_at", "")
+    if isinstance(created_at, datetime):
+        created_at = created_at.isoformat()
+    
+    email_verified_at = user.get("email_verified_at", "")
+    if isinstance(email_verified_at, datetime):
+        email_verified_at = email_verified_at.isoformat()
+    
     return jsonify({
         "user": {
             "id": str(user["_id"]),
             "name": user["name"],
             "email": user["email"],
             "email_verified": user.get("email_verified", False),
-            "created_at": user.get("created_at", ""),
-            "email_verified_at": user.get("email_verified_at", ""),
+            "created_at": created_at,
+            "email_verified_at": email_verified_at,
         }
     })
 
