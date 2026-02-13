@@ -323,7 +323,7 @@ function clearAuth() {
 // ========== EMAIL VERIFICATION ==========
 function showVerification(email) {
     const overlay = $("#verificationOverlay");
-    overlay.style.display = "block";
+    overlay.classList.add("active");
     $("#verificationError").style.display = "none";
     $("#verificationSuccess").style.display = "none";
     $("#verificationCode").value = "";
@@ -337,7 +337,7 @@ function showVerification(email) {
 }
 
 function hideVerification() {
-    $("#verificationOverlay").style.display = "none";
+    $("#verificationOverlay").classList.remove("active");
 }
 
 function showVerificationError(msg) {
