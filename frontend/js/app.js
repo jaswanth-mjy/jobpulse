@@ -275,7 +275,9 @@ async function handleSignIn(e) {
             localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
             
             // Check if email verification is pending
+            console.log("🔍 Sign-in response:", { pending_verification: data.pending_verification, email_sent: data.email_sent });
             if (data.pending_verification) {
+                console.log("✅ Verification required - showing verification modal");
                 hideAuth();
                 showVerification(email);
                 if (data.email_sent) {
@@ -284,6 +286,7 @@ async function handleSignIn(e) {
                     showToast("⚠️ Email sending is not configured. Contact admin.", "warning");
                 }
             } else {
+                console.log("✅ No verification required - showing app");
                 // Legacy flow - already verified or old accounts
                 hideAuth();
                 showApp();
@@ -322,7 +325,14 @@ function clearAuth() {
 
 // ========== EMAIL VERIFICATION ==========
 function showVerification(email) {
+    console.log("🔍 showVerification() called with email:", email);
     const overlay = $("#verificationOverlay");
+    if (!overlay) {
+        console.error("❌ verificationOverlay element not found!");
+        return;
+    }
+    
+    console.log("✅ Adding 'active' class to verification overlay");
     overlay.classList.add("active");
     $("#verificationError").style.display = "none";
     $("#verificationSuccess").style.display = "none";
@@ -333,7 +343,11 @@ function showVerification(email) {
     }
     
     // Auto-focus on code input
-    setTimeout(() => $("#verificationCode").focus(), 100);
+    setTimeout(() => {
+        const codeInput = $("#verificationCode");
+        if (codeInput) codeInput.focus();
+        console.log("📧 Verification modal should now be visible");
+    }, 100);
 }
 
 function hideVerification() {
