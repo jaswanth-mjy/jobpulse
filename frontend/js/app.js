@@ -222,9 +222,22 @@ async function handleSignUp(e) {
             currentUser = data.user;
             localStorage.setItem("jobpulse_token", authToken);
             localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
-            hideAuth();
-            showApp();
-            showToast("Account created! Welcome to JobPulse 🎉 Connect your Gmail to auto-import applications.", "success");
+            
+            // Check if email verification is pending
+            if (data.pending_verification) {
+                hideAuth();
+                showVerification(email);
+                if (data.email_sent) {
+                    showToast("📧 Verification code sent to your email!", "info");
+                } else {
+                    showToast("⚠️ Email sending is not configured. Contact admin.", "warning");
+                }
+            } else {
+                // Legacy flow - skip verification
+                hideAuth();
+                showApp();
+                showToast("Account created! Welcome to JobPulse 🎉 Connect your Gmail to auto-import applications.", "success");
+            }
         } else {
             showAuthError(data.error || "Signup failed");
         }

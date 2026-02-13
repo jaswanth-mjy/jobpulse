@@ -145,21 +145,51 @@ def signup():
         "email": email_addr,
         "password": hashed.decode("utf-8"),
         "created_at": datetime.utcnow().isoformat(),
+        "email_verified": False,
     }
     result = db.users.insert_one(user)
     user_id = str(result.inserted_id)
+    
+    # Generate 6-digit verification code
+    verification_code = "{:06d}".format(random.randint(0, 999999))
+    verification_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store verification code in database
+    db.email_verifications.update_one(
+        {"user_id": ObjectId(user_id)},
+        {
+            "$set": {
+                "user_id": ObjectId(user_id),
+                "code": verification_code,
+                "email": email_addr,
+                "expires_at": verification_expiry,
+                "verified": False,
+                "created_at": datetime.utcnow(),
+            }
+        },
+        upsert=True
+    )
+    
+    # Send verification email
+    email_sent = send_verification_email(email_addr, verification_code, name)
+    
+    if not email_sent:
+        print(f"⚠️  Failed to send verification email to {email_addr}")
 
-    # Generate JWT
-    token = jwt.encode({
+    # Generate temporary token (will be upgraded after verification)
+    temp_token = jwt.encode({
         "user_id": user_id,
         "email": email_addr,
+        "verified": False,
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
     }, JWT_SECRET, algorithm="HS256")
 
     return jsonify({
-        "message": "Account created successfully!",
-        "token": token,
+        "message": "Account created! Please verify your email.",
+        "token": temp_token,
         "user": {"id": user_id, "name": name, "email": email_addr},
+        "pending_verification": True,
+        "email_sent": email_sent,
     }), 201
 
 
