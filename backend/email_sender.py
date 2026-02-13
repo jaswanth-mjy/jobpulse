@@ -559,3 +559,129 @@ JobPulse - Track Your Career Journey
     except Exception as e:
         print(f"❌ Failed to send welcome email: {e}")
         return False
+
+
+def send_password_reset_email(to_email: str, reset_code: str, user_name: str = "") -> bool:
+    """
+    Send a password reset email with a 6-digit code
+    
+    Args:
+        to_email: Recipient email address
+        reset_code: 6-digit reset code
+        user_name: User's name for personalization
+        
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print("⚠️  Email sending disabled: SMTP credentials not configured in .env")
+        return False
+    
+    try:
+        # Create message
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Reset Your JobPulse Password"
+        msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
+        msg["To"] = to_email
+        
+        # Create HTML and text versions
+        greeting = f"Hello {user_name}," if user_name else "Hello,"
+        
+        text_content = f"""
+{greeting}
+
+We received a request to reset your JobPulse password.
+
+Your password reset code is: {reset_code}
+
+This code will expire in 10 minutes.
+
+If you didn't request this password reset, please ignore this email or contact support if you have concerns.
+
+Thanks,
+The JobPulse Team
+"""
+        
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center; }}
+        .logo {{ font-size: 48px; margin-bottom: 10px; }}
+        .header h1 {{ color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; }}
+        .content {{ padding: 40px 30px; }}
+        .greeting {{ font-size: 18px; color: #333; margin-bottom: 20px; font-weight: 600; }}
+        .message {{ color: #555; line-height: 1.6; margin-bottom: 30px; font-size: 16px; }}
+        .code-box {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 30px; text-align: center; border-radius: 8px; margin: 30px 0; }}
+        .code-label {{ font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; opacity: 0.9; }}
+        .code {{ font-size: 42px; font-weight: 700; letter-spacing: 8px; font-family: 'Courier New', monospace; }}
+        .warning {{ background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }}
+        .warning-icon {{ color: #ffc107; font-size: 20px; margin-right: 10px; }}
+        .warning-text {{ color: #856404; font-size: 14px; }}
+        .expiry {{ text-align: center; color: #666; font-size: 13px; margin-top: 15px; font-style: italic; }}
+        .footer {{ background-color: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 14px; }}
+        .footer-note {{ margin-top: 15px; font-size: 12px; color: #999; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🔐</div>
+            <h1>Password Reset Request</h1>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">{greeting}</div>
+            
+            <div class="message">
+                We received a request to reset your JobPulse password. Use the code below to reset your password:
+            </div>
+            
+            <div class="code-box">
+                <div class="code-label">Your Reset Code</div>
+                <div class="code">{reset_code}</div>
+                <div class="expiry">⏰ Expires in 10 minutes</div>
+            </div>
+            
+            <div class="message">
+                Enter this code in the password reset form to create a new password.
+            </div>
+            
+            <div class="warning">
+                <span class="warning-icon">⚠️</span>
+                <span class="warning-text"><strong>Didn't request this?</strong> If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <strong>JobPulse</strong> - Smart Job Application Tracker
+            <div class="footer-note">
+                This is an automated message. For security reasons, this code will expire in 10 minutes.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+        
+        part1 = MIMEText(text_content, "plain")
+        part2 = MIMEText(html_content, "html")
+        msg.attach(part1)
+        msg.attach(part2)
+        
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+        
+        print(f"✅ Password reset email sent to {to_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to send password reset email: {e}")
+        return False

@@ -125,6 +125,9 @@ function showAuth(mode) {
     if (mode === "signup") {
         $("#signinForm").style.display = "none";
         $("#signupForm").style.display = "block";
+    } else if (mode === "forgot") {
+        hideAuth();
+        showForgotPassword();
     } else {
         $("#signinForm").style.display = "block";
         $("#signupForm").style.display = "none";
@@ -471,6 +474,184 @@ async function handleResendCode() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-paper-plane"></i> Resend Code';
+    }
+}
+
+// ========== FORGOT PASSWORD ==========
+let forgotPasswordEmail = "";
+
+function showForgotPassword() {
+    const overlay = $("#forgotPasswordOverlay");
+    overlay.classList.add("active");
+    $("#forgotPasswordForm").style.display = "block";
+    $("#resetPasswordForm").style.display = "none";
+    $("#forgotError").style.display = "none";
+    $("#forgotSuccess").style.display = "none";
+    $("#resetError").style.display = "none";
+    $("#forgotEmail").value = "";
+    
+    setTimeout(() => $("#forgotEmail").focus(), 100);
+}
+
+function hideForgotPassword() {
+    $("#forgotPasswordOverlay").classList.remove("active");
+    forgotPasswordEmail = "";
+}
+
+function showForgotError(msg) {
+    const el = $("#forgotError");
+    el.textContent = msg;
+    el.style.display = "block";
+    $("#forgotSuccess").style.display = "none";
+}
+
+function showForgotSuccess(msg) {
+    const el = $("#forgotSuccess");
+    el.textContent = msg;
+    el.style.display = "block";
+    $("#forgotError").style.display = "none";
+}
+
+function showResetError(msg) {
+    const el = $("#resetError");
+    el.textContent = msg;
+    el.style.display = "block";
+}
+
+async function handleForgotPassword() {
+    const btn = $("#forgotBtn");
+    const email = $("#forgotEmail").value.trim();
+    
+    if (!email) {
+        showForgotError("Please enter your email address");
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    $("#forgotError").style.display = "none";
+    
+    try {
+        const res = await fetch(`${API}/auth/forgot-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            forgotPasswordEmail = email;
+            showForgotSuccess("📧 Reset code sent! Check your email.");
+            showToast("Check your email for reset code", "info");
+            
+            // Switch to reset form after 2 seconds
+            setTimeout(() => {
+                $("#forgotPasswordForm").style.display = "none";
+                $("#resetPasswordForm").style.display = "block";
+                $("#resetEmailText").textContent = `Code sent to ${email}`;
+                $("#resetCode").focus();
+            }, 2000);
+        } else {
+            showForgotError(data.error || "Failed to send reset code");
+        }
+    } catch (err) {
+        showForgotError("Network error. Please try again.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Reset Code';
+    }
+}
+
+async function handleResetPassword() {
+    const btn = $("#resetBtn");
+    const code = $("#resetCode").value.trim();
+    const newPassword = $("#newPassword").value;
+    const confirmPassword = $("#confirmPassword").value;
+    
+    if (!code) {
+        showResetError("Please enter the reset code");
+        return;
+    }
+    
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+        showResetError("Code must be 6 digits");
+        return;
+    }
+    
+    if (!newPassword) {
+        showResetError("Please enter a new password");
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showResetError("Password must be at least 6 characters");
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showResetError("Passwords do not match");
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...';
+    $("#resetError").style.display = "none";
+    
+    try {
+        const res = await fetch(`${API}/auth/reset-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                email: forgotPasswordEmail, 
+                code, 
+                new_password: newPassword 
+            }),
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast("✅ Password reset successfully! You can now sign in.", "success");
+            
+            // Close modal and show sign-in form
+            setTimeout(() => {
+                hideForgotPassword();
+                showAuth("signin");
+            }, 1500);
+        } else {
+            showResetError(data.error || "Failed to reset password");
+        }
+    } catch (err) {
+        showResetError("Network error. Please try again.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Reset Password';
+    }
+}
+
+async function handleResendResetCode() {
+    if (!forgotPasswordEmail) {
+        showResetError("Please start over from the email step");
+        return;
+    }
+    
+    showResetError("");
+    
+    try {
+        const res = await fetch(`${API}/auth/forgot-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: forgotPasswordEmail }),
+        });
+        
+        if (res.ok) {
+            showToast("📧 New reset code sent!", "success");
+            $("#resetCode").value = "";
+            $("#resetCode").focus();
+        } else {
+            showResetError("Failed to resend code");
+        }
+    } catch (err) {
+        showResetError("Network error. Please try again.");
     }
 }
 

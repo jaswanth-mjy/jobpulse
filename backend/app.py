@@ -467,6 +467,111 @@ def resend_verification():
     })
 
 
+@app.route("/api/auth/forgot-password", methods=["POST"])
+def forgot_password():
+    """Request a password reset code via email"""
+    from email_sender import send_password_reset_email
+    
+    data = request.get_json()
+    email_addr = data.get("email", "").strip().lower()
+    
+    if not email_addr:
+        return jsonify({"error": "Email is required"}), 400
+    
+    db = get_db()
+    user = db.users.find_one({"email": email_addr})
+    
+    # Always return success (don't reveal if email exists)
+    if not user:
+        return jsonify({
+            "message": "If that email is registered, you'll receive a password reset code shortly.",
+            "email_sent": True
+        })
+    
+    # Generate 6-digit reset code
+    reset_code = "{:06d}".format(random.randint(0, 999999))
+    reset_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store reset code in database
+    db.password_resets.update_one(
+        {"user_id": user["_id"]},
+        {
+            "$set": {
+                "code": reset_code,
+                "expires_at": reset_expiry,
+                "created_at": datetime.utcnow(),
+                "used": False
+            }
+        },
+        upsert=True
+    )
+    
+    # Send reset email
+    email_sent = send_password_reset_email(email_addr, reset_code, user.get("name", ""))
+    
+    return jsonify({
+        "message": "If that email is registered, you'll receive a password reset code shortly.",
+        "email_sent": email_sent
+    })
+
+
+@app.route("/api/auth/reset-password", methods=["POST"])
+def reset_password():
+    """Reset password with code from email"""
+    data = request.get_json()
+    email_addr = data.get("email", "").strip().lower()
+    code = data.get("code", "").strip()
+    new_password = data.get("new_password", "").strip()
+    
+    if not email_addr or not code or not new_password:
+        return jsonify({"error": "Email, code, and new password are required"}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    
+    db = get_db()
+    user = db.users.find_one({"email": email_addr})
+    
+    if not user:
+        return jsonify({"error": "Invalid email or reset code"}), 400
+    
+    # Find reset record
+    reset_record = db.password_resets.find_one({"user_id": user["_id"]})
+    
+    if not reset_record:
+        return jsonify({"error": "No password reset request found"}), 404
+    
+    # Check if already used
+    if reset_record.get("used"):
+        return jsonify({"error": "This reset code has already been used"}), 400
+    
+    # Check expiry
+    if datetime.utcnow() > reset_record["expires_at"]:
+        return jsonify({"error": "Reset code has expired. Please request a new one."}), 400
+    
+    # Verify code
+    if reset_record["code"] != code:
+        return jsonify({"error": "Invalid reset code"}), 400
+    
+    # Update password
+    hashed_password = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt())
+    db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password": hashed_password}}
+    )
+    
+    # Mark reset code as used
+    db.password_resets.update_one(
+        {"user_id": user["_id"]},
+        {"$set": {"used": True, "used_at": datetime.utcnow()}}
+    )
+    
+    return jsonify({
+        "message": "Password reset successfully! You can now sign in with your new password.",
+        "success": True
+    })
+
+
 # ============================================================
 #  METADATA
 # ============================================================

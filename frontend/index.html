@@ -313,6 +313,11 @@
                         <label><i class="fas fa-lock"></i> Password</label>
                         <input type="password" id="signinPassword" required placeholder="••••••••" minlength="6">
                     </div>
+                    <div style="text-align: right; margin-top: -10px; margin-bottom: 15px;">
+                        <a href="#" onclick="showAuth('forgot'); return false;" style="color: #6366f1; font-size: 14px; text-decoration: none;">
+                            Forgot password?
+                        </a>
+                    </div>
                     <button type="submit" class="btn btn-primary auth-submit" id="signinBtn">
                         <i class="fas fa-sign-in-alt"></i> Sign In
                     </button>
@@ -436,6 +441,113 @@
                 
                 <div class="auth-error" id="verificationError" style="display:none; margin-top: 15px;"></div>
                 <div class="auth-success" id="verificationSuccess" style="display:none; margin-top: 15px; background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; border: 1px solid #c3e6cb;"></div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ========================================================
+         FORGOT PASSWORD MODAL
+         ======================================================== -->
+    <div class="auth-overlay" id="forgotPasswordOverlay">
+        <div class="auth-modal" style="max-width: 450px;">
+            <button class="auth-close" onclick="hideForgotPassword()"><i class="fas fa-times"></i></button>
+            
+            <div class="auth-form-container" id="forgotPasswordForm">
+                <div class="auth-header">
+                    <i class="fas fa-key auth-logo-icon" style="color: #6366f1;"></i>
+                    <h2>Reset Password</h2>
+                    <p>Enter your email to receive a reset code</p>
+                </div>
+                
+                <div class="auth-field">
+                    <label><i class="fas fa-envelope"></i> Email</label>
+                    <input 
+                        type="email" 
+                        id="forgotEmail" 
+                        required 
+                        placeholder="you@example.com"
+                        onkeypress="if(event.key==='Enter'){handleForgotPassword();}"
+                    >
+                </div>
+                
+                <button 
+                    class="btn btn-primary auth-submit" 
+                    id="forgotBtn" 
+                    onclick="handleForgotPassword()"
+                >
+                    <i class="fas fa-paper-plane"></i> Send Reset Code
+                </button>
+                
+                <div class="auth-error" id="forgotError" style="display:none; margin-top: 15px;"></div>
+                <div class="auth-success" id="forgotSuccess" style="display:none; margin-top: 15px; background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; border: 1px solid #c3e6cb;"></div>
+            </div>
+            
+            <div class="auth-form-container" id="resetPasswordForm" style="display:none;">
+                <div class="auth-header">
+                    <i class="fas fa-lock-open auth-logo-icon" style="color: #6366f1;"></i>
+                    <h2>Enter Reset Code</h2>
+                    <p id="resetEmailText">Check your email for the code</p>
+                </div>
+                
+                <div class="auth-field">
+                    <label><i class="fas fa-key"></i> Reset Code</label>
+                    <input 
+                        type="text" 
+                        id="resetCode" 
+                        required 
+                        placeholder="000000" 
+                        maxlength="6"
+                        pattern="[0-9]{6}"
+                        style="text-align: center; font-size: 24px; letter-spacing: 8px; font-family: 'Courier New', monospace;"
+                    >
+                    <small style="display: block; margin-top: 8px; color: #666;">
+                        Enter the 6-digit code sent to your email
+                    </small>
+                </div>
+                
+                <div class="auth-field">
+                    <label><i class="fas fa-lock"></i> New Password</label>
+                    <input 
+                        type="password" 
+                        id="newPassword" 
+                        required 
+                        placeholder="Min 6 characters"
+                        minlength="6"
+                    >
+                </div>
+                
+                <div class="auth-field">
+                    <label><i class="fas fa-lock"></i> Confirm Password</label>
+                    <input 
+                        type="password" 
+                        id="confirmPassword" 
+                        required 
+                        placeholder="Re-enter new password"
+                        minlength="6"
+                        onkeypress="if(event.key==='Enter'){handleResetPassword();}"
+                    >
+                </div>
+                
+                <button 
+                    class="btn btn-primary auth-submit" 
+                    id="resetBtn" 
+                    onclick="handleResetPassword()"
+                >
+                    <i class="fas fa-check-circle"></i> Reset Password
+                </button>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <button 
+                        class="btn btn-ghost" 
+                        onclick="handleResendResetCode()"
+                        style="font-size: 14px;"
+                    >
+                        <i class="fas fa-paper-plane"></i> Resend Code
+                    </button>
+                </div>
+                
+                <div class="auth-error" id="resetError" style="display:none; margin-top: 15px;"></div>
             </div>
         </div>
     </div>
