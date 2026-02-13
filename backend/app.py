@@ -221,7 +221,35 @@ def signin():
 
     user_id = str(user["_id"])
     
-    # Generate 6-digit verification code
+    # Check if email is already verified
+    # For backward compatibility: if field doesn't exist, consider it a legacy user and mark as verified
+    email_already_verified = user.get("email_verified", None)
+    
+    if email_already_verified is None:
+        # Legacy user without email_verified field - auto-verify them
+        db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"email_verified": True, "email_verified_at": datetime.utcnow()}}
+        )
+        email_already_verified = True
+    
+    if email_already_verified:
+        # User already verified - direct login
+        token = jwt.encode({
+            "user_id": user_id,
+            "email": email_addr,
+            "verified": True,
+            "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
+        }, JWT_SECRET, algorithm="HS256")
+
+        return jsonify({
+            "message": "Signed in successfully",
+            "token": token,
+            "user": {"id": user_id, "name": user["name"], "email": email_addr},
+            "pending_verification": False,
+        })
+    
+    # Email not verified - send verification code
     verification_code = "{:06d}".format(random.randint(0, 999999))
     verification_expiry = datetime.utcnow() + timedelta(minutes=10)
     
