@@ -89,7 +89,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const data = await res.json();
                 currentUser = data.user;
                 
-                // Check if email is verified
+                // Update localStorage with fresh user data
+                localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+                
+                // Check if email needs verification (only for unverified password users)
                 if (!data.user.email_verified) {
                     console.log("⚠️ Email not verified - prompting verification");
                     showLanding(); // Keep landing page visible in background
@@ -304,8 +307,8 @@ async function handleSignUp(e) {
             localStorage.setItem("jobpulse_token", authToken);
             localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
             
-            // Check if email verification is pending or not verified  
-            if (data.pending_verification || !currentUser.email_verified) {
+            // Check if email verification is pending (only on signup)
+            if (data.pending_verification) {
                 hideAuth();
                 showVerification(email);
                 if (data.email_sent) {
@@ -355,10 +358,10 @@ async function handleSignIn(e) {
             localStorage.setItem("jobpulse_token", authToken);
             localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
             
-            // Check if email verification is pending or not verified
+            // Check if email verification is pending (backend explicitly requires it)
             console.log("🔍 Sign-in response:", { pending_verification: data.pending_verification, email_sent: data.email_sent });
-            if (data.pending_verification || !currentUser.email_verified) {
-                console.log("✅ Verification required - showing verification modal");
+            if (data.pending_verification) {
+                console.log("⚠️ Verification required - showing verification modal");
                 hideAuth();
                 showVerification(email);
                 if (data.email_sent) {
@@ -367,7 +370,7 @@ async function handleSignIn(e) {
                     showToast("⚠️ Email sending is not configured. Contact admin.", "warning");
                 }
             } else {
-                console.log("✅ No verification required - showing app");
+                console.log("✅ Already verified or Google user - showing app");
                 // Legacy flow - already verified or old accounts
                 hideAuth();
                 showApp();
