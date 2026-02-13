@@ -132,15 +132,12 @@ function showApp() {
 function handleOnboardingAction(action) {
     switch (action) {
         case 'add-application':
-            hideOnboarding();
-            resetForm();
-            setView("add");
-            showToast("Add your first job application!", "info");
+            // Show info without hiding tutorial
+            showToast("Click 'Next' to continue or try adding an application!", "info");
             break;
         case 'connect-gmail':
-            hideOnboarding();
-            setView("gmail");
-            showToast("Connect Gmail to auto-import applications", "info");
+            // Show info without hiding tutorial
+            showToast("Click 'Next' to continue or explore Gmail import!", "info");
             break;
         default:
             console.log("Unknown onboarding action:", action);

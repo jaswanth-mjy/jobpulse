@@ -146,11 +146,8 @@ class OnboardingGuide {
         if (this.onActionCallback) {
             this.onActionCallback(action);
         }
-
-        // Auto-proceed after certain actions
-        if (action === 'add-application' || action === 'connect-gmail') {
-            setTimeout(() => this.next(), 500);
-        }
+        // Note: Removed auto-proceed to keep tutorial visible
+        // Users can manually click 'Next' to continue
     }
 }
 
