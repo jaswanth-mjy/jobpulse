@@ -692,11 +692,11 @@ body {
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 200;
+    z-index: 9999;
 }
 
 .auth-overlay.active {
-    display: flex;
+    display: flex !important;
     animation: fadeIn 0.25s ease;
 }
 
