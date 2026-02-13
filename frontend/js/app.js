@@ -92,18 +92,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                 // Update localStorage with fresh user data
                 localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
                 
-                // Check if email needs verification (only for unverified password users)
-                if (!data.user.email_verified) {
-                    console.log("⚠️ Email not verified - showing verification modal");
-                    showLanding(); // Keep landing page visible in background
-                    showVerification(currentUser.email);
-                    showToast("📧 Please verify your email to access the dashboard", "warning");
-                } else {
-                    console.log("✅ Email verified - showing app");
-                    showApp();
-                    // Auto-scan on page load if Gmail connected
-                    triggerAutoScanIfConnected();
-                }
+                // Show app - verification will be handled by 403 error if needed
+                console.log("✅ Valid token - showing app");
+                showApp();
+                // Auto-scan on page load if Gmail connected
+                triggerAutoScanIfConnected();
             } else {
                 clearAuth();
                 showLanding();
