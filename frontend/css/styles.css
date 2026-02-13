@@ -2137,7 +2137,7 @@ textarea:focus-visible {
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 400;
+    z-index: 10000;
     animation: fadeIn 0.2s ease;
 }
 
