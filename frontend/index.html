@@ -381,6 +381,65 @@
         </div>
     </div>
 
+    <!-- Email Verification Modal -->
+    <div class="auth-overlay" id="verificationOverlay" style="display: none;">
+        <div class="auth-modal" style="max-width: 450px;">
+            <button class="auth-close" onclick="hideVerification()"><i class="fas fa-times"></i></button>
+            
+            <div class="auth-form-container">
+                <div class="auth-header">
+                    <i class="fas fa-envelope-circle-check auth-logo-icon" style="color: #6366f1;"></i>
+                    <h2>Verify Your Email</h2>
+                    <p id="verificationEmailText">We've sent a 6-digit code to your email</p>
+                </div>
+                
+                <div class="verification-code-container">
+                    <div class="auth-field">
+                        <label><i class="fas fa-key"></i> Verification Code</label>
+                        <input 
+                            type="text" 
+                            id="verificationCode" 
+                            required 
+                            placeholder="000000" 
+                            maxlength="6"
+                            pattern="[0-9]{6}"
+                            style="text-align: center; font-size: 24px; letter-spacing: 8px; font-family: 'Courier New', monospace;"
+                            onkeypress="if(event.key==='Enter'){handleVerifyEmail();}"
+                        >
+                        <small style="display: block; margin-top: 8px; color: #666;">
+                            Enter the 6-digit code sent to your email
+                        </small>
+                    </div>
+                    
+                    <button 
+                        class="btn btn-primary auth-submit" 
+                        id="verifyBtn" 
+                        onclick="handleVerifyEmail()"
+                    >
+                        <i class="fas fa-check-circle"></i> Verify Email
+                    </button>
+                    
+                    <div style="text-align: center; margin-top: 20px;">
+                        <p style="color: #666; font-size: 14px; margin-bottom: 10px;">
+                            Didn't receive the code?
+                        </p>
+                        <button 
+                            class="btn btn-ghost" 
+                            id="resendBtn" 
+                            onclick="handleResendCode()"
+                            style="font-size: 14px;"
+                        >
+                            <i class="fas fa-paper-plane"></i> Resend Code
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="auth-error" id="verificationError" style="display:none; margin-top: 15px;"></div>
+                <div class="auth-success" id="verificationSuccess" style="display:none; margin-top: 15px; background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; border: 1px solid #c3e6cb;"></div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- ========================================================
          APP (Dashboard — visible after login)

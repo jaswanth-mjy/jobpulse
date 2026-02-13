@@ -16,11 +16,22 @@ import os
 import threading
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
+import random
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # Resolve frontend folder (sibling of backend/)
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
+
+# Import email sender
+try:
+    from email_sender import send_verification_email, send_welcome_email
+    EMAIL_ENABLED = True
+except ImportError as e:
+    print(f"⚠️  Email sending disabled: {e}")
+    EMAIL_ENABLED = False
+    def send_verification_email(*args, **kwargs): return False
+    def send_welcome_email(*args, **kwargs): return False
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app, supports_credentials=True)
@@ -168,26 +179,48 @@ def signin():
         return jsonify({"error": "Invalid email or password"}), 401
 
     user_id = str(user["_id"])
-
-    token = jwt.encode({
+    
+    # Generate 6-digit verification code
+    verification_code = "{:06d}".format(random.randint(0, 999999))
+    verification_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store verification code in database
+    db.email_verifications.update_one(
+        {"user_id": ObjectId(user_id)},
+        {
+            "$set": {
+                "user_id": ObjectId(user_id),
+                "code": verification_code,
+                "email": email_addr,
+                "expires_at": verification_expiry,
+                "verified": False,
+                "created_at": datetime.utcnow(),
+            }
+        },
+        upsert=True
+    )
+    
+    # Send verification email
+    email_sent = send_verification_email(email_addr, verification_code, user.get("name", ""))
+    
+    if not email_sent:
+        # If email fails, still allow login but warn user
+        print(f"⚠️  Failed to send verification email to {email_addr}")
+    
+    # Generate temporary token (will be upgraded after verification)
+    temp_token = jwt.encode({
         "user_id": user_id,
         "email": email_addr,
+        "verified": False,
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
     }, JWT_SECRET, algorithm="HS256")
 
-    # Check if user has Gmail connected → flag for auto-scan
-    gmail_connected = db.gmail_config.count_documents({"user_id": ObjectId(user_id)}) > 0
-
-    # Trigger background scan if Gmail is connected
-    if gmail_connected:
-        _trigger_background_scan(user_id)
-
     return jsonify({
-        "message": "Signed in successfully!",
-        "token": token,
+        "message": "Verification code sent to your email",
+        "token": temp_token,
         "user": {"id": user_id, "name": user["name"], "email": email_addr},
-        "gmail_connected": gmail_connected,
-        "auto_scan": gmail_connected,
+        "pending_verification": True,
+        "email_sent": email_sent,
     })
 
 
@@ -276,6 +309,120 @@ def auth_me():
             "name": user["name"],
             "email": user["email"],
         }
+    })
+
+
+@app.route("/api/auth/verify-email", methods=["POST"])
+@require_auth
+def verify_email():
+    """Verify email with code sent during signin"""
+    data = request.get_json()
+    code = data.get("code", "").strip()
+    
+    if not code:
+        return jsonify({"error": "Verification code is required"}), 400
+    
+    db = get_db()
+    user_id = ObjectId(g.user_id)
+    
+    # Find verification record
+    verification = db.email_verifications.find_one({"user_id": user_id})
+    
+    if not verification:
+        return jsonify({"error": "No verification code found. Please request a new one."}), 404
+    
+    # Check if already verified
+    if verification.get("verified"):
+        return jsonify({"message": "Email already verified", "verified": True})
+    
+    # Check expiry
+    if datetime.utcnow() > verification["expires_at"]:
+        return jsonify({"error": "Verification code has expired. Please request a new one."}), 400
+    
+    # Verify code
+    if verification["code"] != code:
+        return jsonify({"error": "Invalid verification code"}), 400
+    
+    # Mark as verified
+    db.email_verifications.update_one(
+        {"user_id": user_id},
+        {"$set": {"verified": True, "verified_at": datetime.utcnow()}}
+    )
+    
+    # Update user record
+    db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"email_verified": True, "email_verified_at": datetime.utcnow()}}
+    )
+    
+    # Generate new token with verified status
+    user = db.users.find_one({"_id": user_id})
+    new_token = jwt.encode({
+        "user_id": str(user_id),
+        "email": user["email"],
+        "verified": True,
+        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
+    }, JWT_SECRET, algorithm="HS256")
+    
+    # Send welcome email (optional)
+    send_welcome_email(user["email"], user.get("name", ""))
+    
+    # Check if user has Gmail connected for auto-scan
+    gmail_connected = db.gmail_config.count_documents({"user_id": user_id}) > 0
+    if gmail_connected:
+        _trigger_background_scan(str(user_id))
+    
+    return jsonify({
+        "message": "Email verified successfully!",
+        "verified": True,
+        "token": new_token,
+        "gmail_connected": gmail_connected,
+        "auto_scan": gmail_connected,
+    })
+
+
+@app.route("/api/auth/resend-verification", methods=["POST"])
+@require_auth
+def resend_verification():
+    """Resend verification code"""
+    db = get_db()
+    user_id = ObjectId(g.user_id)
+    user = db.users.find_one({"_id": user_id})
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Check if already verified
+    verification = db.email_verifications.find_one({"user_id": user_id})
+    if verification and verification.get("verified"):
+        return jsonify({"error": "Email already verified"}), 400
+    
+    # Generate new code
+    verification_code = "{:06d}".format(random.randint(0, 999999))
+    verification_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Update verification record
+    db.email_verifications.update_one(
+        {"user_id": user_id},
+        {
+            "$set": {
+                "code": verification_code,
+                "expires_at": verification_expiry,
+                "created_at": datetime.utcnow(),
+            }
+        },
+        upsert=True
+    )
+    
+    # Send email
+    email_sent = send_verification_email(user["email"], verification_code, user.get("name", ""))
+    
+    if not email_sent:
+        return jsonify({"error": "Failed to send verification email. Please try again later."}), 500
+    
+    return jsonify({
+        "message": "Verification code sent to your email",
+        "email_sent": True,
     })
 
 

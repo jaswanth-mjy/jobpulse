@@ -260,14 +260,27 @@ async function handleSignIn(e) {
             currentUser = data.user;
             localStorage.setItem("jobpulse_token", authToken);
             localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
-            hideAuth();
-            showApp();
-            showToast("Welcome back! 👋", "success");
+            
+            // Check if email verification is pending
+            if (data.pending_verification) {
+                hideAuth();
+                showVerification(email);
+                if (data.email_sent) {
+                    showToast("📧 Verification code sent to your email!", "info");
+                } else {
+                    showToast("⚠️ Email sending is not configured. Contact admin.", "warning");
+                }
+            } else {
+                // Legacy flow - already verified or old accounts
+                hideAuth();
+                showApp();
+                showToast("Welcome back! 👋", "success");
 
-            // Auto-scan Gmail if connected
-            if (data.auto_scan) {
-                showToast("📧 Auto-scanning Gmail for new applications...", "info");
-                pollScanStatus();
+                // Auto-scan Gmail if connected
+                if (data.auto_scan) {
+                    showToast("📧 Auto-scanning Gmail for new applications...", "info");
+                    pollScanStatus();
+                }
             }
         } else {
             showAuthError(data.error || "Invalid credentials");
@@ -292,6 +305,123 @@ function clearAuth() {
     currentUser = null;
     localStorage.removeItem("jobpulse_token");
     localStorage.removeItem("jobpulse_user");
+}
+
+// ========== EMAIL VERIFICATION ==========
+function showVerification(email) {
+    const overlay = $("#verificationOverlay");
+    overlay.style.display = "block";
+    $("#verificationError").style.display = "none";
+    $("#verificationSuccess").style.display = "none";
+    $("#verificationCode").value = "";
+    
+    if (email) {
+        $("#verificationEmailText").textContent = `We've sent a 6-digit code to ${email}`;
+    }
+    
+    // Auto-focus on code input
+    setTimeout(() => $("#verificationCode").focus(), 100);
+}
+
+function hideVerification() {
+    $("#verificationOverlay").style.display = "none";
+}
+
+function showVerificationError(msg) {
+    const el = $("#verificationError");
+    el.textContent = msg;
+    el.style.display = "block";
+    $("#verificationSuccess").style.display = "none";
+}
+
+function showVerificationSuccess(msg) {
+    const el = $("#verificationSuccess");
+    el.textContent = msg;
+    el.style.display = "block";
+    $("#verificationError").style.display = "none";
+}
+
+async function handleVerifyEmail() {
+    const btn = $("#verifyBtn");
+    const code = $("#verificationCode").value.trim();
+    
+    if (!code) {
+        showVerificationError("Please enter the verification code");
+        return;
+    }
+    
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+        showVerificationError("Code must be 6 digits");
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+    $("#verificationError").style.display = "none";
+    
+    try {
+        const res = await authFetch(`${API}/auth/verify-email`, {
+            method: "POST",
+            body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            // Update token with verified status
+            authToken = data.token;
+            localStorage.setItem("jobpulse_token", authToken);
+            
+            showVerificationSuccess("✅ Email verified successfully!");
+            showToast("Email verified! Welcome to JobPulse! 🎉", "success");
+            
+            // Close verification modal and show app
+            setTimeout(() => {
+                hideVerification();
+                showApp();
+                
+                // Auto-scan if Gmail connected
+                if (data.auto_scan) {
+                    showToast("📧 Auto-scanning Gmail for new applications...", "info");
+                    pollScanStatus();
+                }
+            }, 1500);
+        } else {
+            showVerificationError(data.error || "Verification failed");
+        }
+    } catch (err) {
+        showVerificationError("Network error. Please try again.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Email';
+    }
+}
+
+async function handleResendCode() {
+    const btn = $("#resendBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    $("#verificationError").style.display = "none";
+    
+    try {
+        const res = await authFetch(`${API}/auth/resend-verification`, {
+            method: "POST",
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showVerificationSuccess("📧 New verification code sent to your email!");
+            showToast("New code sent!", "success");
+            $("#verificationCode").value = "";
+            $("#verificationCode").focus();
+        } else {
+            showVerificationError(data.error || "Failed to resend code");
+        }
+    } catch (err) {
+        showVerificationError("Network error. Please try again.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Resend Code';
+    }
 }
 
 // ========== LOAD METADATA ==========
