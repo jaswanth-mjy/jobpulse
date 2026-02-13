@@ -216,7 +216,15 @@ def signin():
     db = get_db()
     user = db.users.find_one({"email": email_addr})
 
-    if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password"].encode("utf-8")):
+    if not user:
+        return jsonify({"error": "Invalid email or password"}), 401
+    
+    # Handle password encoding - might be string or bytes in database
+    stored_password = user["password"]
+    if isinstance(stored_password, str):
+        stored_password = stored_password.encode("utf-8")
+    
+    if not bcrypt.checkpw(password.encode("utf-8"), stored_password):
         return jsonify({"error": "Invalid email or password"}), 401
 
     user_id = str(user["_id"])
@@ -295,24 +303,51 @@ def signin():
 
 @app.route("/api/auth/google", methods=["POST"])
 def google_auth():
-    """Sign in (or sign up) using Google ID token from Google Identity Services."""
-    from google.oauth2 import id_token
-    from google.auth.transport import requests as google_requests
+    """Sign in (or sign up) using Google OAuth 2.0 authorization code."""
+    import requests as http_requests
 
     data = request.get_json()
-    credential = data.get("credential", "")
+    code = data.get("code", "")
+    redirect_uri = data.get("redirect_uri", "")
 
-    if not credential:
-        return jsonify({"error": "Google credential is required"}), 400
+    if not code:
+        return jsonify({"error": "Authorization code is required"}), 400
 
     if not GOOGLE_CLIENT_ID:
         return jsonify({"error": "Google sign-in is not configured on the server."}), 500
 
+    # Get client secret from environment
+    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    if not GOOGLE_CLIENT_SECRET:
+        return jsonify({"error": "Google client secret not configured"}), 500
+
     try:
-        # Verify the Google ID token
-        idinfo = id_token.verify_oauth2_token(
-            credential, google_requests.Request(), GOOGLE_CLIENT_ID
-        )
+        # Exchange authorization code for access token
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code"
+        }
+        
+        token_response = http_requests.post(token_url, data=token_data)
+        if token_response.status_code != 200:
+            return jsonify({"error": "Failed to exchange authorization code"}), 400
+        
+        token_json = token_response.json()
+        access_token = token_json.get("access_token")
+        
+        # Get user info using access token
+        userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        userinfo_response = http_requests.get(userinfo_url, headers=headers)
+        
+        if userinfo_response.status_code != 200:
+            return jsonify({"error": "Failed to get user info from Google"}), 400
+        
+        idinfo = userinfo_response.json()
 
         google_email = idinfo["email"].lower()
         google_name = idinfo.get("name", google_email.split("@")[0])
@@ -325,6 +360,13 @@ def google_auth():
             # Existing user — sign in
             user_id = str(user["_id"])
             name = user["name"]
+            
+            # Ensure email_verified is set for Google users (backward compatibility)
+            if not user.get("email_verified"):
+                db.users.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"email_verified": True, "email_verified_at": datetime.utcnow()}}
+                )
         else:
             # New user — create account (no password needed for Google users)
             new_user = {
@@ -333,6 +375,8 @@ def google_auth():
                 "password": "",  # Google users don't have a local password
                 "auth_provider": "google",
                 "picture": google_picture,
+                "email_verified": True,  # Google has already verified the email
+                "email_verified_at": datetime.utcnow(),
                 "created_at": datetime.utcnow().isoformat(),
             }
             result = db.users.insert_one(new_user)
@@ -342,6 +386,7 @@ def google_auth():
         token = jwt.encode({
             "user_id": user_id,
             "email": google_email,
+            "verified": True,  # Google users are always verified
             "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
         }, JWT_SECRET, algorithm="HS256")
 
@@ -694,6 +739,10 @@ def get_applications():
     search = request.args.get("search")
     sort_by = request.args.get("sort_by", "applied_date")
     order = request.args.get("order", "desc")
+    
+    # Pagination parameters
+    limit = request.args.get("limit", type=int)
+    offset = request.args.get("offset", 0, type=int)
 
     query = {"user_id": ObjectId(g.user_id)}
 
@@ -713,8 +762,25 @@ def get_applications():
         sort_by = "applied_date"
     sort_dir = -1 if order.lower() == "desc" else 1
 
+    # Get total count for pagination metadata
+    total_count = db.applications.count_documents(query)
+    
     cursor = db.applications.find(query).sort(sort_by, sort_dir)
-    return jsonify([mongo_to_dict(doc) for doc in cursor])
+    
+    # Apply pagination if limit is specified
+    if limit:
+        cursor = cursor.skip(offset).limit(limit)
+        applications = [mongo_to_dict(doc) for doc in cursor]
+        return jsonify({
+            "applications": applications,
+            "total": total_count,
+            "offset": offset,
+            "limit": limit,
+            "has_more": offset + limit < total_count
+        })
+    else:
+        # Legacy support - return all applications without pagination
+        return jsonify([mongo_to_dict(doc) for doc in cursor])
 
 
 @app.route("/api/applications/<app_id>", methods=["GET"])

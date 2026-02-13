@@ -20,6 +20,13 @@ let currentUser = JSON.parse(localStorage.getItem("jobpulse_user") || "null");
 let recentlyUpdatedIds = new Set(); // Track recently updated applications
 let recentlyImportedIds = new Set(); // Track recently imported applications
 
+// Pagination state
+let currentOffset = 0;
+let pageSize = 50;
+let hasMoreData = true;
+let isLoadingMore = false;
+let totalApplications = 0;
+
 // ========== DOM REFS ==========
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -46,6 +53,22 @@ function authFetch(url, options = {}) {
         }
         return response;
     });
+}
+
+// ========== PASSWORD VISIBILITY TOGGLE ==========
+function togglePasswordVisibility(inputId, button) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
 }
 
 // ========== INIT ==========
@@ -145,48 +168,76 @@ function showAuthError(msg) {
     el.style.display = "block";
 }
 
-// ========== GOOGLE SIGN-IN ==========
-let _googleInitialized = false;
-
-function initGoogleSignIn() {
-    if (_googleInitialized || !GOOGLE_CLIENT_ID || !window.google) return;
-    try {
-        google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: handleGoogleCredentialResponse,
-        });
-        _googleInitialized = true;
-    } catch (e) {
-        console.warn("Google Sign-In init failed:", e);
-    }
-}
-
+// ========== GOOGLE SIGN-IN (OAuth 2.0 Popup Flow) ==========
 function triggerGoogleSignIn() {
     if (!GOOGLE_CLIENT_ID) {
         showAuthError("Google Sign-In is not configured yet. Please use email/password.");
-        return;
-    }
-    initGoogleSignIn();
-    if (_googleInitialized) {
-        google.accounts.id.prompt((notification) => {
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                // Fallback: use the popup flow
-                google.accounts.id.prompt();
-            }
-        });
-    }
-}
-
-async function handleGoogleCredentialResponse(response) {
-    const credential = response.credential;
-    if (!credential) {
-        showAuthError("No credential received from Google.");
         return;
     }
 
     // Disable both buttons while processing
     const signinBtn = $("#googleSigninBtn");
     const signupBtn = $("#googleSignupBtn");
+    if (signinBtn) { signinBtn.disabled = true; signinBtn.textContent = "Opening Google..."; }
+    if (signupBtn) { signupBtn.disabled = true; signupBtn.textContent = "Opening Google..."; }
+
+    // Build OAuth URL
+    const redirectUri = `${window.location.origin}/google-callback.html`;
+    const scope = "openid email profile";
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${GOOGLE_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `access_type=online&` +
+        `prompt=select_account`;
+
+    // Open popup window
+    const width = 500;
+    const height = 600;
+    const left = (window.innerWidth - width) / 2 + window.screenX;
+    const top = (window.innerHeight - height) / 2 + window.screenY;
+    
+    const popup = window.open(
+        authUrl,
+        "Google Sign In",
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,location=no,status=no`
+    );
+
+    // Listen for message from popup
+    window.addEventListener("message", handleGoogleCallback, false);
+
+    // Check if popup was blocked
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        showAuthError("Popup was blocked. Please allow popups for this site.");
+        if (signinBtn) { signinBtn.disabled = false; signinBtn.textContent = "Sign in with Google"; }
+        if (signupBtn) { signupBtn.disabled = false; signupBtn.textContent = "Sign up with Google"; }
+    }
+}
+
+async function handleGoogleCallback(event) {
+    // Verify origin
+    if (event.origin !== window.location.origin) return;
+    
+    const { code, error } = event.data;
+    
+    // Re-enable buttons
+    const signinBtn = $("#googleSigninBtn");
+    const signupBtn = $("#googleSignupBtn");
+    if (signinBtn) { signinBtn.disabled = false; signinBtn.textContent = "Sign in with Google"; }
+    if (signupBtn) { signupBtn.disabled = false; signupBtn.textContent = "Sign up with Google"; }
+
+    if (error) {
+        showAuthError(`Google Sign-In failed: ${error}`);
+        return;
+    }
+
+    if (!code) return;
+
+    // Remove event listener
+    window.removeEventListener("message", handleGoogleCallback);
+
+    // Disable buttons again while processing
     if (signinBtn) { signinBtn.disabled = true; signinBtn.textContent = "Signing in..."; }
     if (signupBtn) { signupBtn.disabled = true; signupBtn.textContent = "Signing in..."; }
 
@@ -194,7 +245,10 @@ async function handleGoogleCredentialResponse(response) {
         const res = await fetch(`${API}/auth/google`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ credential }),
+            body: JSON.stringify({ 
+                code,
+                redirect_uri: `${window.location.origin}/google-callback.html`
+            }),
         });
         const data = await res.json();
 
@@ -785,8 +839,14 @@ function populateSelect(el, items, hasAll = false) {
 }
 
 // ========== REFRESH DATA ==========
-async function refreshData() {
+async function refreshData(resetPagination = true) {
     try {
+        if (resetPagination) {
+            currentOffset = 0;
+            hasMoreData = true;
+            allApplications = [];
+        }
+        
         const params = new URLSearchParams();
         const platform = $("#filterPlatform")?.value;
         const status = $("#filterStatus")?.value;
@@ -799,6 +859,10 @@ async function refreshData() {
         if (search) params.set("search", search);
         if (sortBy) params.set("sort_by", sortBy);
         if (order) params.set("order", order);
+        
+        // Add pagination parameters
+        params.set("limit", pageSize);
+        params.set("offset", currentOffset);
 
         const res = await authFetch(`${API}/applications?${params}`);
         if (res.status === 401) {
@@ -806,11 +870,20 @@ async function refreshData() {
             showLanding();
             return;
         }
-        const allData = await res.json();
+        const data = await res.json();
+        
+        // Handle both paginated and legacy response formats
+        const newApps = data.applications || data;
+        hasMoreData = data.has_more !== undefined ? data.has_more : false;
+        totalApplications = data.total || newApps.length;
         
         // Separate valid and invalid applications, auto-fix status mismatches
-        invalidApplications = [];
-        allApplications = allData.filter(app => {
+        if (resetPagination) {
+            invalidApplications = [];
+        }
+        
+        const validNewApps = [];
+        newApps.forEach(app => {
             // Try to auto-fix status mismatches before validation
             if (app.status_history && Array.isArray(app.status_history) && app.status_history.length > 0) {
                 const sortedHistory = [...app.status_history].sort((a, b) => {
@@ -829,16 +902,27 @@ async function refreshData() {
             const isValid = validateApplication(app);
             if (!isValid) {
                 invalidApplications.push(app);
+            } else {
+                validNewApps.push(app);
             }
-            return isValid;
         });
         
+        // Append new apps to existing list or replace if resetting
+        if (resetPagination) {
+            allApplications = validNewApps;
+        } else {
+            allApplications = [...allApplications, ...validNewApps];
+        }
+        
+        // Update offset for next load
+        currentOffset = allApplications.length;
+        
         // Show warning if there are invalid applications, otherwise clear it
-        if (invalidApplications.length > 0) {
+        if (invalidApplications.length > 0 && resetPagination) {
             console.warn(`⚠️ ${invalidApplications.length} applications failed validation and are hidden from dashboard`);
             console.warn("Invalid applications:", invalidApplications.map(app => `${app.company} - ${app.role}`));
             showValidationWarning(invalidApplications.length);
-        } else {
+        } else if (resetPagination) {
             // Clear any existing validation warning
             const existing = $("#validationWarning");
             if (existing) existing.remove();
@@ -847,9 +931,62 @@ async function refreshData() {
 
         renderDashboard();
         renderApplicationsTable();
+        updatePaginationUI();
     } catch (e) {
         console.error("Failed to refresh data:", e);
+    } finally {
+        isLoadingMore = false;
     }
+}
+
+// ========== LOAD MORE (INFINITE SCROLL) ==========
+async function loadMoreApplications() {
+    if (isLoadingMore || !hasMoreData) return;
+    
+    isLoadingMore = true;
+    $("#loadingMore").style.display = "flex";
+    
+    try {
+        await refreshData(false); // false = don't reset pagination
+    } catch (e) {
+        console.error("Failed to load more:", e);
+        showToast("Failed to load more applications", "error");
+    } finally {
+        $("#loadingMore").style.display = "none";
+    }
+}
+
+// Update pagination UI indicators
+function updatePaginationUI() {
+    const loadingMore = $("#loadingMore");
+    const allLoaded = $("#allLoaded");
+    
+    if (loadingMore) loadingMore.style.display = "none";
+    
+    if (allLoaded) {
+        allLoaded.style.display = hasMoreData ? "none" : "flex";
+    }
+}
+
+// Setup infinite scroll
+function setupInfiniteScroll() {
+    const applicationsView = $("#applicationsView");
+    if (!applicationsView) return;
+    
+    let scrollTimeout;
+    applicationsView.addEventListener("scroll", () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            const scrollTop = applicationsView.scrollTop;
+            const scrollHeight = applicationsView.scrollHeight;
+            const clientHeight = applicationsView.clientHeight;
+            
+            // Load more when 300px from bottom
+            if (scrollHeight - scrollTop - clientHeight < 300 && hasMoreData && !isLoadingMore) {
+                loadMoreApplications();
+            }
+        }, 100);
+    });
 }
 
 // ========== VALIDATION WARNING ==========
@@ -1062,16 +1199,16 @@ function setupEventListeners() {
     // Cancel
     $("#cancelBtn").addEventListener("click", () => setView("applications"));
 
-    // Filters
+    // Filters (reset pagination when filters change)
     ["filterPlatform", "filterStatus", "sortBy", "sortOrder"].forEach((id) => {
-        $(`#${id}`)?.addEventListener("change", refreshData);
+        $(`#${id}`)?.addEventListener("change", () => refreshData(true));
     });
 
-    // Search (debounced)
+    // Search (debounced, reset pagination)
     let searchTimer;
     $("#globalSearch").addEventListener("input", () => {
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(refreshData, 350);
+        searchTimer = setTimeout(() => refreshData(true), 350);
     });
 
     // Modal close
@@ -1082,7 +1219,29 @@ function setupEventListeners() {
 
     // Mobile menu
     $("#menuToggle").addEventListener("click", () => {
-        $(".sidebar").classList.toggle("open");
+        const sidebar = $(".sidebar");
+        const overlay = $("#sidebarOverlay");
+        sidebar.classList.toggle("open");
+        overlay.classList.toggle("active");
+    });
+
+    // Close sidebar when clicking overlay
+    const sidebarOverlay = $("#sidebarOverlay");
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener("click", () => {
+            $(".sidebar").classList.remove("open");
+            sidebarOverlay.classList.remove("active");
+        });
+    }
+
+    // Close sidebar when clicking nav items on mobile
+    document.querySelectorAll(".nav-item").forEach(item => {
+        item.addEventListener("click", () => {
+            if (window.innerWidth <= 768) {
+                $(".sidebar").classList.remove("open");
+                $("#sidebarOverlay").classList.remove("active");
+            }
+        });
     });
 
     // Gmail
@@ -1093,6 +1252,9 @@ function setupEventListeners() {
         showToast("Showing imported applications", "info");
     });
     setupGmailForm();
+    
+    // Setup infinite scroll for applications view
+    setupInfiniteScroll();
 }
 
 // ========== VIEW SWITCHING ==========
@@ -1469,7 +1631,7 @@ function clearFilters() {
     $("#filterStatus").value = "";
     $("#sortBy").value = "applied_date";
     $("#sortOrder").value = "desc";
-    refreshData();
+    refreshData(true); // Reset pagination when clearing filters
     showToast("Filters cleared", "info");
 }
 
