@@ -89,10 +89,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const data = await res.json();
                 currentUser = data.user;
                 
-                // Check if email verification is pending
-                if (data.pending_verification) {
-                    console.log("⚠️ Email verification pending - showing verification modal");
+                // Check if email is verified
+                if (!data.user.email_verified) {
+                    console.log("⚠️ Email not verified - prompting verification");
                     showLanding(); // Keep landing page visible in background
+                    // Request verification code
+                    await requestVerificationCode(currentUser.email);
                     showVerification(currentUser.email);
                     showToast("📧 Please verify your email to access the dashboard", "warning");
                 } else {
@@ -302,8 +304,8 @@ async function handleSignUp(e) {
             localStorage.setItem("jobpulse_token", authToken);
             localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
             
-            // Check if email verification is pending
-            if (data.pending_verification) {
+            // Check if email verification is pending or not verified  
+            if (data.pending_verification || !currentUser.email_verified) {
                 hideAuth();
                 showVerification(email);
                 if (data.email_sent) {
@@ -353,9 +355,9 @@ async function handleSignIn(e) {
             localStorage.setItem("jobpulse_token", authToken);
             localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
             
-            // Check if email verification is pending
+            // Check if email verification is pending or not verified
             console.log("🔍 Sign-in response:", { pending_verification: data.pending_verification, email_sent: data.email_sent });
-            if (data.pending_verification) {
+            if (data.pending_verification || !currentUser.email_verified) {
                 console.log("✅ Verification required - showing verification modal");
                 hideAuth();
                 showVerification(email);
@@ -515,6 +517,27 @@ async function confirmDeleteAccount() {
 }
 
 // ========== EMAIL VERIFICATION ==========
+async function requestVerificationCode(email) {
+    try {
+        const res = await authFetch(`${API}/auth/resend-verification`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+        });
+        
+        if (res.ok) {
+            console.log("✅ Verification code sent to", email);
+            return true;
+        } else {
+            console.warn("⚠️ Failed to send verification code");
+            return false;
+        }
+    } catch (err) {
+        console.error("❌ Error sending verification code:", err);
+        return false;
+    }
+}
+
 function showVerification(email) {
     console.log("🔍 showVerification() called with email:", email);
     const overlay = $("#verificationOverlay");
@@ -528,6 +551,7 @@ function showVerification(email) {
     $("#verificationError").style.display = "none";
     $("#verificationSuccess").style.display = "none";
     $("#verificationCode").value = "";
+    $("#verificationEmail").textContent = email || "your email";
     
     if (email) {
         $("#verificationEmailText").textContent = `We've sent a 6-digit code to ${email}`;
@@ -590,6 +614,12 @@ async function handleVerifyEmail() {
             // Update token with verified status
             authToken = data.token;
             localStorage.setItem("jobpulse_token", authToken);
+            
+            // Update currentUser with verified status
+            if (currentUser) {
+                currentUser.email_verified = true;
+                localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            }
             
             showVerificationSuccess("✅ Email verified successfully!");
             showToast("Email verified! Welcome to JobPulse! 🎉", "success");
