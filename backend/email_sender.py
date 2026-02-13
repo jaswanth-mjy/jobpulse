@@ -42,7 +42,7 @@ def send_verification_email(to_email: str, verification_code: str, user_name: st
         msg["Subject"] = f"Verify Your JobPulse Account"
         msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
         msg["To"] = to_email
-        msg["Reply-To"] = "noreply@jobpulse.app"
+        # Don't add Reply-To - let replies go to the actual sender email
         
         # Create HTML and text versions
         greeting = f"Hello {user_name}," if user_name else "Hello,"
@@ -307,7 +307,7 @@ def send_welcome_email(to_email: str, user_name: str = "") -> bool:
         msg["Subject"] = "Welcome to JobPulse! 🎉"
         msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
         msg["To"] = to_email
-        msg["Reply-To"] = "noreply@jobpulse.app"
+        # Don't add Reply-To - let replies go to the actual sender email
         
         greeting = f"Hello {user_name}," if user_name else "Hello,"
         
