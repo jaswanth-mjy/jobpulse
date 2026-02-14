@@ -1386,7 +1386,7 @@ function setView(name) {
         views.applications = $("#applicationsView");
         views.add = $("#addView");
         views.gmail = $("#gmailView");
-        views.gmailScan = $("#gmailScanView");
+        views["gmail-scan"] = $("#gmailScanView");
     }
 
     Object.values(views).forEach((v) => v?.classList.remove("active"));
@@ -1400,7 +1400,7 @@ function setView(name) {
         applications: "Applications", 
         add: "Add Application", 
         gmail: "Gmail Import",
-        gmailScan: "Gmail Scan"
+        "gmail-scan": "Gmail Scan"
     };
     $("#pageTitle").textContent = titles[name] || "";
 
