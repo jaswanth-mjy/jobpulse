@@ -480,8 +480,6 @@ def verify_email():
     # Find verification record
     verification = db.email_verifications.find_one({"user_id": user_id})
     
-    print(f"🔍 Debug verification for user {user_id}: {verification}")
-    
     if not verification:
         return jsonify({"error": "No verification code found. Please request a new one."}), 404
     
@@ -492,10 +490,6 @@ def verify_email():
     # Check expiry
     if datetime.utcnow() > verification["expires_at"]:
         return jsonify({"error": "Verification code has expired. Please request a new one."}), 400
-    
-    # Debug: show expected vs entered code
-    expected_code = verification.get("code", "")
-    print(f"🔍 Expected: '{expected_code}', Entered: '{code}'")
     
     # Verify code
     if verification["code"] != code:
@@ -1244,8 +1238,8 @@ def gmail_scan():
             return jsonify({"error": "No Gmail accounts connected. Please connect first."}), 401
 
         data = request.get_json() or {}
-        days_back = data.get("days_back", 90)
-        max_results = data.get("max_results", 500)
+        days_back = data.get("days_back", 365)
+        max_results = data.get("max_results", 2000)
 
         all_applications = []
         for acct in accounts:

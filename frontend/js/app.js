@@ -489,17 +489,19 @@ function hideProfileSettings() {
 
 function restartOnboardingTutorial() {
     hideProfileSettings();
+    
+    // Ensure onboarding is reset and ready
     if (typeof resetOnboarding === 'function') {
         resetOnboarding();
-        setTimeout(() => {
-            if (typeof showOnboarding === 'function') {
-                showOnboarding(handleOnboardingAction);
-                showToast("Tutorial restarted! Let's go through it again.", "info");
-            }
-        }, 500);
-    } else {
-        showToast("Onboarding feature not available", "error");
     }
+    
+    // Wait for profile modal to close, then show onboarding
+    setTimeout(() => {
+        if (typeof showOnboarding === 'function') {
+            showOnboarding(handleOnboardingAction);
+            showToast("Tutorial restarted! Let's go through it again.", "info");
+        }
+    }, 400);
 }
 
 function showProfileError(msg) {
@@ -1448,11 +1450,22 @@ function renderRecentTable() {
     const tbody = $("#recentTable tbody");
     if (!tbody) return;
     
-    // Sort by updated_date to show most recently changed applications first
+    // Sort to show most recent applications first, with recently updated ones also surfaced
     const sortedApps = [...allApplications].sort((a, b) => {
-        const dateA = new Date(a.updated_date || a.applied_date);
-        const dateB = new Date(b.updated_date || b.applied_date);
-        return dateB - dateA;
+        // Primary sort: applied_date (most recent applications)
+        const appliedA = new Date(a.applied_date);
+        const appliedB = new Date(b.applied_date);
+        const appliedDiff = appliedB - appliedA;
+        
+        // If applied dates are more than 7 days apart, use that
+        if (Math.abs(appliedDiff) > 7 * 24 * 60 * 60 * 1000) {
+            return appliedDiff;
+        }
+        
+        // If applied dates are close, consider updated_date as tiebreaker
+        const updatedA = a.updated_date ? new Date(a.updated_date) : appliedA;
+        const updatedB = b.updated_date ? new Date(b.updated_date) : appliedB;
+        return updatedB - updatedA;
     });
     
     const recent = sortedApps.slice(0, 5);
@@ -1470,9 +1483,11 @@ function renderRecentTable() {
         const updateBadge = isUpdated ? ' <span class="update-badge updated"><i class="fas fa-sync-alt"></i>Updated</span>' : 
                            isNew ? ' <span class="update-badge new"><i class="fas fa-check-circle"></i>New</span>' : '';
         
-        // Show when it was last updated
-        const lastUpdate = app.updated_date && app.updated_date !== app.applied_date 
-            ? `<span style="color:var(--text-muted);font-size:0.85rem;display:block;margin-top:2px;">Updated ${formatDate(app.updated_date)}</span>`
+        // Always show applied_date prominently, note if recently updated
+        const appliedDate = formatDate(app.applied_date);
+        const wasRecentlyUpdated = app.updated_date && app.updated_date !== app.applied_date;
+        const updateNote = wasRecentlyUpdated 
+            ? `<span style="color:#f59e0b;font-size:0.85rem;font-weight:500;">↻ Updated ${formatDate(app.updated_date)}</span>`
             : '';
         
         return `
@@ -1481,7 +1496,7 @@ function renderRecentTable() {
             <td>${esc(app.role)}</td>
             <td>${platformBadge(app.platform)}</td>
             <td>${statusBadge(app.status)}${updateBadge}</td>
-            <td>${formatDate(app.applied_date)}${lastUpdate}</td>
+            <td><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;">${appliedDate}</span>${updateNote}</div></td>
         </tr>`;
     }).join("");
 }
@@ -1506,6 +1521,14 @@ function renderApplicationsTable() {
                          isNew ? 'background: rgba(16, 185, 129, 0.08); transition: all 0.3s ease;' : 'transition: all 0.3s ease;';
         const updateBadge = isUpdated ? ' <span class="update-badge updated"><i class="fas fa-sync-alt"></i>Updated</span>' : 
                            isNew ? ' <span class="update-badge new"><i class="fas fa-check-circle"></i>New</span>' : '';
+        
+        // Show applied_date prominently, note if recently updated
+        const appliedDate = formatDate(app.applied_date);
+        const wasRecentlyUpdated = app.updated_date && app.updated_date !== app.applied_date;
+        const updateNote = wasRecentlyUpdated 
+            ? `<span style="color:#f59e0b;font-size:0.85rem;font-weight:500;">↻ Updated ${formatDate(app.updated_date)}</span>`
+            : '';
+        
         return `
         <tr style="${rowStyle}">
             <td class="company-cell">${esc(app.company)}</td>
@@ -1514,7 +1537,7 @@ function renderApplicationsTable() {
             <td>${statusBadge(app.status)}${updateBadge}</td>
             <td>${esc(app.location || "—")}</td>
             <td>${esc(app.salary || "—")}</td>
-            <td>${formatDate(app.applied_date)}</td>
+            <td><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;">${appliedDate}</span>${updateNote}</div></td>
             <td>
                 <div class="action-btns">
                     <button class="action-btn" title="View" onclick="viewApplication('${app.id}')">
@@ -2264,7 +2287,7 @@ async function startGmailScan() {
     try {
         const res = await authFetch(`${API}/gmail/scan`, {
             method: "POST",
-            body: JSON.stringify({ days_back: parseInt(daysBack), max_results: 100 }),
+            body: JSON.stringify({ days_back: parseInt(daysBack), max_results: 2000 }),
         });
 
         const data = await res.json();

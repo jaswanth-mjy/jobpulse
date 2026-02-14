@@ -54,6 +54,13 @@ class OnboardingGuide {
             overlay.classList.remove('active');
         }
     }
+    
+    dismiss() {
+        // Called when user closes without explicitly skipping/completing
+        // Mark as completed to prevent showing again
+        this.markCompleted();
+        this.hide();
+    }
 
     next() {
         if (this.currentStep < this.totalSteps - 1) {
@@ -173,13 +180,18 @@ function showOnboarding(onActionCallback) {
 
 function hideOnboarding() {
     if (onboardingGuide) {
-        onboardingGuide.hide();
+        onboardingGuide.dismiss(); // Use dismiss instead of hide to mark as completed
     }
 }
 
 function resetOnboarding() {
+    // Always clear localStorage first
+    localStorage.removeItem('jobpulse_onboarding_completed');
+    
+    // Reset the instance if it exists
     if (onboardingGuide) {
-        onboardingGuide.resetOnboarding();
+        onboardingGuide.isCompleted = false;
+        onboardingGuide.currentStep = 0;
     }
 }
 
