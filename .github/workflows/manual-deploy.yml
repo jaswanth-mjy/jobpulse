@@ -1,0 +1,99 @@
+---
+name: 🚀 Manual Vercel Deployment
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+
+jobs:
+  deploy:
+    name: Deploy to Vercel (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Check Vercel Token
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "❌ VERCEL_TOKEN secret is not configured"
+            echo ""
+            echo "📝 Setup instructions:"
+            echo "1. Get token from: https://vercel.com/account/tokens"
+            echo "2. Add to: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "3. Name it: VERCEL_TOKEN"
+            echo ""
+            echo "See .github/SECRETS-QUICK.md for details"
+            exit 1
+          fi
+          echo "✅ Vercel token found"
+      
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+      
+      - name: Pull Vercel Environment
+        run: |
+          if [ "${{ inputs.environment }}" == "production" ]; then
+            vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+          fi
+      
+      - name: Build Project
+        run: |
+          if [ "${{ inputs.environment }}" == "production" ]; then
+            vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            vercel build --token=${{ secrets.VERCEL_TOKEN }}
+          fi
+      
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          if [ "${{ inputs.environment }}" == "production" ]; then
+            DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          else
+            DEPLOYMENT_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          fi
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo ""
+          echo "✅ Deployment successful!"
+          echo "🌐 URL: $DEPLOYMENT_URL"
+      
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.deploy.outputs.deployment_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Test the deployment: ${{ steps.deploy.outputs.deployment_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify OAuth callback: Settings → Update redirect URI" >> $GITHUB_STEP_SUMMARY
+          echo "3. Monitor logs: [Vercel Dashboard](https://vercel.com/dashboard)" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Comment on commit
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.deployment_url }}';
+            const env = '${{ inputs.environment }}';
+            const message = `🚀 **Manual Deployment to ${env}**\n\n✅ Deployed successfully!\n\n**URL:** ${url}\n\n*Triggered by @${{ github.actor }}*`;
+            
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: message
+            });

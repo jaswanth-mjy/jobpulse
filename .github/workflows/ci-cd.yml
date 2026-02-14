@@ -157,6 +157,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      - name: Check Vercel Token
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "⚠️  VERCEL_TOKEN secret is not configured"
+            echo "📝 To enable automatic Vercel deployments:"
+            echo "   1. Create token: https://vercel.com/account/tokens"
+            echo "   2. Add to GitHub: Settings → Secrets → Actions → VERCEL_TOKEN"
+            echo "   3. See .github/SECRETS.md for detailed instructions"
+            echo "🔧 Manual deployment: Run ./setup-vercel.sh locally"
+            exit 1
+          fi
+          echo "✓ Vercel token configured"
+      
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
       
@@ -167,7 +180,23 @@ jobs:
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
       
       - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        id: deploy
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $DEPLOYMENT_URL"
+      
+      - name: Comment Deployment URL
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: '🚀 Deployed to Vercel: ${{ steps.deploy.outputs.deployment_url }}'
+            })
 
   # ========== DEPLOY TO RENDER (on main branch) ==========
   deploy-render:
@@ -177,9 +206,29 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
-      - name: Trigger Render Deployment
+      - name: Check Render Deploy Hook
         run: |
-          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
+            echo "⚠️  RENDER_DEPLOY_HOOK secret is not configured"
+            echo "📝 To enable automatic Render deployments:"
+            echo "   1. Go to Render Dashboard → Your Service → Settings"
+            echo "   2. Create Deploy Hook"
+            echo "   3. Add to GitHub: Settings → Secrets → Actions → RENDER_DEPLOY_HOOK"
+            echo "   4. See .github/SECRETS.md for detailed instructions"
+            echo "🔧 Manual deployment: Push to main branch (render.yaml configured)"
+            exit 0  # Don't fail the workflow, just skip
+          fi
+          echo "✓ Render deploy hook configured"
+      
+      - name: Trigger Render Deployment
+        if: secrets.RENDER_DEPLOY_HOOK != ''
+        run: |
+          HTTP_CODE=$(curl -X POST -o /dev/null -w "%{http_code}" ${{ secrets.RENDER_DEPLOY_HOOK }})
+          if [ $HTTP_CODE -eq 200 ] || [ $HTTP_CODE -eq 201 ]; then
+            echo "✅ Render deployment triggered successfully"
+          else
+            echo "⚠️  Render deployment may have failed (HTTP $HTTP_CODE)"
+          fi
         continue-on-error: true
 
   # ========== NOTIFICATIONS ==========
