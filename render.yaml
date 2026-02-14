@@ -1,36 +1,124 @@
-# render.yaml — Render.com Blueprint
+# render.yaml — Render.com Advanced Blueprint
+# Documentation: https://render.com/docs/blueprint-spec
 ---
 services:
+  # ========== WEB SERVICE ==========
   - type: web
-    name: jobpulse
+    name: jobpulse-api
     runtime: python
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --preload
+    branch: main
+    
+    # Build Configuration
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python -c "from backend.database import init_db; init_db()"
+    
+    # Start Command
+    startCommand: cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 50 --preload --access-logfile - --error-logfile -
+    
+    # Health Check
     healthCheckPath: /health
+    
+    # Auto Deploy
+    autoDeploy: true
+    
+    # Environment Variables
     envVars:
+      # Python Configuration
       - key: PYTHON_VERSION
         value: "3.11.6"
+      
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      
+      # Database
       - key: MONGODB_URI
         sync: false
+      
+      # Authentication & Security
       - key: JWT_SECRET
         sync: false
+      
       - key: ENCRYPTION_KEY
         sync: false
+      
+      # Google OAuth
       - key: GOOGLE_CLIENT_ID
         sync: false
+      
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      
+      - key: OAUTH_REDIRECT_URI
+        sync: false
+      
+      # Email Configuration (SMTP)
       - key: SMTP_HOST
         value: smtp.gmail.com
+      
       - key: SMTP_PORT
         value: "587"
+      
       - key: SMTP_USER
         sync: false
+      
       - key: SMTP_PASSWORD
         sync: false
+      
       - key: FROM_EMAIL
         sync: false
+      
       - key: FROM_NAME
         value: JobPulse
+      
+      # Application Settings
+      - key: FLASK_ENV
+        value: production
+      
+      - key: DEBUG
+        value: "false"
+      
+      - key: LOG_LEVEL
+        value: INFO
+      
+    # Disk for persistent storage (if needed)
+    # disk:
+    #   name: jobpulse-data
+    #   mountPath: /data
+    #   sizeGB: 1
+
+# ========== CRON JOBS (Optional) ==========
+# Uncomment to enable background tasks
+# - type: cron
+#   name: jobpulse-cleanup
+#   runtime: python
+#   schedule: "0 2 * * *"  # Run at 2 AM daily
+#   buildCommand: pip install -r requirements.txt
+#   startCommand: python backend/cleanup_task.py
+#   envVars:
+#     - fromService:
+#         type: web
+#         name: jobpulse-api
+#         envVarKey: MONGODB_URI
+
+# ========== BACKGROUND WORKER (Optional) ==========
+# Uncomment to enable background processing
+# - type: worker
+#   name: jobpulse-worker
+#   runtime: python
+#   buildCommand: pip install -r requirements.txt
+#   startCommand: python backend/worker.py
+#   envVars:
+#     - fromService:
+#         type: web
+#         name: jobpulse-api
+#         envVarKey: MONGODB_URI

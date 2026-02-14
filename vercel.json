@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "name": "jobpulse",
+  "builds": [
+    {
+      "src": "backend/app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/privacy-policy",
+      "dest": "frontend/privacy-policy.html"
+    },
+    {
+      "src": "/terms-of-service",
+      "dest": "frontend/terms-of-service.html"
+    },
+    {
+      "src": "/terms",
+      "dest": "frontend/terms-of-service.html"
+    },
+    {
+      "src": "/google-callback.html",
+      "dest": "frontend/google-callback.html"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "frontend/sitemap.xml"
+    },
+    {
+      "src": "/(.*\\.(css|js|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot))",
+      "dest": "frontend/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/index.html"
+    }
+  ],
+  "env": {
+    "MONGODB_URI": "@mongodb_uri",
+    "JWT_SECRET": "@jwt_secret",
+    "ENCRYPTION_KEY": "@encryption_key",
+    "GOOGLE_CLIENT_ID": "@google_client_id",
+    "GOOGLE_CLIENT_SECRET": "@google_client_secret",
+    "GOOGLE_OAUTH_CLIENT_ID": "@google_oauth_client_id",
+    "GOOGLE_OAUTH_CLIENT_SECRET": "@google_oauth_client_secret",
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_PORT": "587",
+    "SMTP_USER": "@smtp_user",
+    "SMTP_PASSWORD": "@smtp_password",
+    "FROM_EMAIL": "@from_email",
+    "FROM_NAME": "JobPulse",
+    "OAUTH_REDIRECT_URI": "@oauth_redirect_uri"
+  },
+  "regions": ["iad1"],
+  "functions": {
+    "backend/app.py": {
+      "runtime": "python3.9",
+      "maxDuration": 60
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/frontend/index.html"
+    }
+  ]
+}
