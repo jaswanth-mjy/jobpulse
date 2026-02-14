@@ -1380,6 +1380,16 @@ function setupEventListeners() {
 // ========== VIEW SWITCHING ==========
 const views = {};
 function setView(name) {
+    // Check if trying to access Gmail Scan without accounts
+    if (name === "gmail-scan") {
+        const gmailScanNavItem = $(".nav-item[data-view='gmail-scan']");
+        if (gmailScanNavItem && gmailScanNavItem.style.display === "none") {
+            showToast("Please add a Gmail account first to use the scan feature.", "info");
+            setView("gmail");
+            return;
+        }
+    }
+
     // Lazy-cache view references
     if (!views.dashboard) {
         views.dashboard = $("#dashboardView");
@@ -2151,11 +2161,14 @@ async function checkGmailStatus() {
 
         renderAccountsList(accounts);
 
-        if (accounts.length > 0) {
-            $("#gmailScanCard").style.display = "block";
-            $("#scanGmailBtn").innerHTML = '<i class="fas fa-envelope"></i> Scan Gmail';
-        } else {
-            $("#gmailScanCard").style.display = "none";
+        // Show/hide Gmail Scan navigation item based on whether accounts exist
+        const gmailScanNavItem = $(".nav-item[data-view='gmail-scan']");
+        if (gmailScanNavItem) {
+            if (accounts.length > 0) {
+                gmailScanNavItem.style.display = "flex";
+            } else {
+                gmailScanNavItem.style.display = "none";
+            }
         }
     } catch (e) {
         console.error("Gmail status check failed:", e);
@@ -2250,7 +2263,10 @@ async function checkOAuthStatus() {
 function setupGmailForm() {
     const authMethodCard = $("#gmailAuthMethodCard");
     const setupCard = $("#gmailSetupCard");
-    if (!authMethodCard || !setupCard) return;
+    if (!authMethodCard || !setupCard) {
+        console.error("Gmail setup cards not found");
+        return;
+    }
     
     // Check OAuth availability on load
     checkOAuthStatus();
