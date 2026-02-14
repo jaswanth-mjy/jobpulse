@@ -1269,8 +1269,13 @@ def parse_email(sender, subject, body, date_str):
     if _is_garbage(company) and _is_garbage(role):
         return None
 
-    company = company or "Unknown Company"
-    role = role or "Unknown Role"
+    # REJECT entries with Unknown Company/Role - better to skip than import bad data
+    if not company or company.lower() in ["unknown company", "unknown"]:
+        print(f"⚠️ Rejecting email with unknown company: '{subject[:50]}...'")
+        return None
+    if not role or role.lower() in ["unknown role", "unknown"]:
+        print(f"⚠️ Rejecting email with unknown role: '{subject[:50]}...'")
+        return None
 
     # Determine platform: known platform > ATS detection > Company Website
     if not platform:

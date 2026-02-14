@@ -405,9 +405,13 @@ def _scan_single_account(account: dict, days_back: int, max_results: int) -> lis
                 if key not in seen:
                     seen.add(key)
                     parsed_applications.append(app)
-                    print(f"  ✅ {app['platform']}: {app['role']} at {app['company']}")
+                    print(f"  ✅ {app['platform']}: {app['role']} at {app['company']} ({app['status']})")
             else:
-                print(f"  ⏭️ Skipped: [{sender[:50]}] {subject[:80]}")
+                # More detailed skip logging for debugging
+                if subject and sender:
+                    print(f"  ⏭️  Skipped: {subject[:60]}... (from {sender.split('<')[0][:30]})")
+                else:
+                    print(f"  ⏭️  Skipped: Unable to parse email")
 
         except Exception as e:
             print(f"  ⚠️ Error processing email: {e}")
@@ -419,13 +423,13 @@ def _scan_single_account(account: dict, days_back: int, max_results: int) -> lis
 
 
 def scan_emails_for_account(email_address: str, app_password: str,
-                             days_back: int = 90, max_results: int = 500) -> list[dict]:
+                             days_back: int = 365, max_results: int = 2000) -> list[dict]:
     """Scan a single Gmail account using explicit credentials (for MongoDB-backed auth)."""
     account = {"email": email_address, "app_password": app_password}
     return _scan_single_account(account, days_back, max_results)
 
 
-def scan_emails(days_back: int = 90, max_results: int = 500, account_id: int | None = None) -> list[dict]:
+def scan_emails(days_back: int = 365, max_results: int = 2000, account_id: int | None = None) -> list[dict]:
     """
     Scan Gmail for job application emails.
     If account_id is given, scan only that account. Otherwise scan all.

@@ -25,11 +25,11 @@
 /* Onboarding Card */
 .onboarding-card {
     background: white;
-    border-radius: 20px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.25);
     width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
+    max-width: 480px;
+    max-height: 85vh;
     overflow-y: auto;
     animation: slideUp 0.4s ease-out;
     position: relative;
@@ -39,23 +39,23 @@
 .onboarding-header {
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
     color: white;
-    padding: 30px 40px;
-    border-radius: 20px 20px 0 0;
+    padding: 24px 32px;
+    border-radius: 16px 16px 0 0;
     position: relative;
 }
 
 .onboarding-close {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 16px;
+    right: 16px;
     background: rgba(255, 255, 255, 0.2);
     border: none;
     color: white;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -68,33 +68,33 @@
 }
 
 .onboarding-step-indicator {
-    font-size: 14px;
+    font-size: 13px;
     opacity: 0.9;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     font-weight: 500;
 }
 
 .onboarding-header h2 {
     margin: 0;
-    font-size: 28px;
-    font-weight: 800;
-    margin-bottom: 8px;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
 }
 
 .onboarding-header p {
     margin: 0;
-    font-size: 16px;
+    font-size: 14px;
     opacity: 0.95;
     line-height: 1.5;
 }
 
 /* Progress Bar */
 .onboarding-progress {
-    height: 4px;
+    height: 3px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 2px;
     overflow: hidden;
-    margin-top: 20px;
+    margin-top: 16px;
 }
 
 .onboarding-progress-bar {
@@ -106,7 +106,7 @@
 
 /* Onboarding Content */
 .onboarding-content {
-    padding: 40px;
+    padding: 32px;
 }
 
 .onboarding-step {
@@ -119,76 +119,76 @@
 }
 
 .onboarding-icon {
-    width: 80px;
-    height: 80px;
+    width: 64px;
+    height: 64px;
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    border-radius: 20px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 36px;
-    margin: 0 auto 24px;
-    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+    font-size: 30px;
+    margin: 0 auto 20px;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
 }
 
 .onboarding-step h3 {
     text-align: center;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
     color: #1e293b;
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
 }
 
 .onboarding-step-description {
     text-align: center;
-    font-size: 16px;
+    font-size: 14px;
     color: #64748b;
     line-height: 1.6;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
 }
 
 /* Feature List */
 .onboarding-features {
     list-style: none;
     padding: 0;
-    margin: 0 0 30px 0;
+    margin: 0 0 24px 0;
 }
 
 .onboarding-features li {
     display: flex;
     align-items: start;
-    padding: 12px 0;
-    font-size: 15px;
+    padding: 10px 0;
+    font-size: 14px;
     color: #475569;
 }
 
 .onboarding-features li i {
     color: #6366f1;
-    margin-right: 12px;
-    margin-top: 3px;
-    font-size: 16px;
+    margin-right: 10px;
+    margin-top: 2px;
+    font-size: 15px;
 }
 
 /* Action Buttons */
 .onboarding-actions {
     display: flex;
-    gap: 12px;
-    margin-top: 30px;
+    gap: 10px;
+    margin-top: 24px;
 }
 
 .onboarding-actions .btn {
     flex: 1;
-    padding: 14px 24px;
-    font-size: 15px;
+    padding: 12px 20px;
+    font-size: 14px;
     font-weight: 600;
-    border-radius: 12px;
+    border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s;
     border: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .btn-onboarding-primary {
@@ -214,8 +214,8 @@
     background: transparent;
     color: #94a3b8;
     padding: 8px 16px;
-    font-size: 14px;
-    margin-top: 12px;
+    font-size: 13px;
+    margin-top: 10px;
     width: 100%;
     justify-content: center;
 }
@@ -229,10 +229,10 @@
 .onboarding-quick-action {
     background: #f8fafc;
     border: 2px dashed #cbd5e1;
-    border-radius: 12px;
-    padding: 24px;
+    border-radius: 10px;
+    padding: 20px;
     text-align: center;
-    margin: 20px 0;
+    margin: 16px 0;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -243,21 +243,21 @@
 }
 
 .onboarding-quick-action i {
-    font-size: 32px;
+    font-size: 28px;
     color: #6366f1;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .onboarding-quick-action h4 {
-    margin: 0 0 8px 0;
-    font-size: 18px;
+    margin: 0 0 6px 0;
+    font-size: 16px;
     font-weight: 600;
     color: #1e293b;
 }
 
 .onboarding-quick-action p {
     margin: 0;
-    font-size: 14px;
+    font-size: 13px;
     color: #64748b;
 }
 
@@ -298,28 +298,37 @@
     .onboarding-card {
         width: 95%;
         margin: 20px;
+        max-width: 100%;
     }
 
     .onboarding-header {
-        padding: 24px 24px;
+        padding: 20px;
     }
 
     .onboarding-header h2 {
-        font-size: 24px;
+        font-size: 19px;
+    }
+
+    .onboarding-header p {
+        font-size: 13px;
     }
 
     .onboarding-content {
-        padding: 24px;
+        padding: 20px;
     }
 
     .onboarding-icon {
-        width: 64px;
-        height: 64px;
-        font-size: 28px;
+        width: 56px;
+        height: 56px;
+        font-size: 26px;
     }
 
     .onboarding-step h3 {
-        font-size: 20px;
+        font-size: 18px;
+    }
+
+    .onboarding-step-description {
+        font-size: 13px;
     }
 
     .onboarding-actions {

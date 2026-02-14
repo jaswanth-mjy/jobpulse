@@ -13,6 +13,7 @@ import bcrypt
 import jwt
 import json
 import os
+import re
 import threading
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
@@ -480,8 +481,6 @@ def verify_email():
     # Find verification record
     verification = db.email_verifications.find_one({"user_id": user_id})
     
-    print(f"🔍 Debug verification for user {user_id}: {verification}")
-    
     if not verification:
         return jsonify({"error": "No verification code found. Please request a new one."}), 404
     
@@ -492,10 +491,6 @@ def verify_email():
     # Check expiry
     if datetime.utcnow() > verification["expires_at"]:
         return jsonify({"error": "Verification code has expired. Please request a new one."}), 400
-    
-    # Debug: show expected vs entered code
-    expected_code = verification.get("code", "")
-    print(f"🔍 Expected: '{expected_code}', Entered: '{code}'")
     
     # Verify code
     if verification["code"] != code:
@@ -1244,8 +1239,8 @@ def gmail_scan():
             return jsonify({"error": "No Gmail accounts connected. Please connect first."}), 401
 
         data = request.get_json() or {}
-        days_back = data.get("days_back", 90)
-        max_results = data.get("max_results", 500)
+        days_back = data.get("days_back", 365)
+        max_results = data.get("max_results", 2000)
 
         all_applications = []
         for acct in accounts:
@@ -1313,11 +1308,26 @@ def gmail_scan():
             email_type = app_data.get("email_type", "applied")
 
             if email_type in ("rejected", "interview", "assessment"):
-                # Try to find existing application by company name (most recent one)
+                # Try to find existing application by company AND role for accurate matching
+                company_escaped = re.escape(app_data['company'])
+                role_escaped = re.escape(app_data['role'])
+                
+                # First try exact company+role match (most accurate)
                 existing = db.applications.find_one(
-                    {"user_id": user_oid, "company": {"$regex": f"^{app_data['company']}$", "$options": "i"}},
+                    {
+                        "user_id": user_oid,
+                        "company": {"$regex": f"^{company_escaped}$", "$options": "i"},
+                        "role": {"$regex": f"^{role_escaped}$", "$options": "i"}
+                    },
                     sort=[("applied_date", -1)]
                 )
+                
+                # Fallback: If no exact match, try just company (for generic rejection emails)
+                if not existing and email_type == "rejected":
+                    existing = db.applications.find_one(
+                        {"user_id": user_oid, "company": {"$regex": f"^{company_escaped}$", "$options": "i"}},
+                        sort=[("applied_date", -1)]
+                    )
                 if existing:
                     old_status = existing["status"]
                     new_status = app_data["status"]
