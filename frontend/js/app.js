@@ -2263,6 +2263,13 @@ async function checkOAuthStatus() {
 function setupGmailForm() {
     const authMethodCard = $("#gmailAuthMethodCard");
     const setupCard = $("#gmailSetupCard");
+    
+    console.log("setupGmailForm initialized", {
+        authMethodCard: !!authMethodCard,
+        setupCard: !!setupCard,
+        addAccountBtn: !!$("#showAddAccountBtn")
+    });
+    
     if (!authMethodCard || !setupCard) {
         console.error("Gmail setup cards not found");
         return;
@@ -2273,12 +2280,23 @@ function setupGmailForm() {
 
     // Show app password form directly when clicking "Add Account" (since OAuth is disabled)
     $("#showAddAccountBtn")?.addEventListener("click", async () => {
+        console.log("Add Account clicked - showing app password form");
+        
         // Skip auth method selection and go directly to app password form
         authMethodCard.style.display = "none";
         setupCard.style.display = "block";
+        
+        // Clear and focus
         $("#gmailEmail").value = "";
         $("#gmailAppPassword").value = "";
-        $("#gmailEmail").focus();
+        
+        // Scroll to the form
+        setupCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Focus with a small delay to ensure form is visible
+        setTimeout(() => {
+            $("#gmailEmail")?.focus();
+        }, 300);
     });
 
     // Cancel from auth method selection
