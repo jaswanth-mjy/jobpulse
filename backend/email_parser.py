@@ -254,6 +254,18 @@ ASSESSMENT_KEYWORDS = [
     "test invitation",
     "test link",
     "assessment link",
+    # Exam keywords
+    "exam scheduled",
+    "schedule your exam",
+    "schedule an exam",
+    "exam invitation",
+    "online exam",
+    "written exam",
+    "take the exam",
+    "complete your exam",
+    "complete the exam",
+    "exam link",
+    # Platform names
     "hackerrank",
     "hackerearth",
     "codility",
