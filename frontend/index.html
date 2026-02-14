@@ -660,6 +660,9 @@
                 <a href="#" class="nav-item" data-view="gmail">
                     <i class="fas fa-envelope"></i> Gmail Import
                 </a>
+                <a href="#" class="nav-item" data-view="gmail-scan">
+                    <i class="fas fa-satellite-dish"></i> Gmail Scan
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-profile-section">
@@ -1045,7 +1048,58 @@
                         </div>
                     </div>
 
-                    <div class="gmail-card" id="gmailScanCard" style="display:none;">
+                    <!-- Quick Scan Button -->
+                    <div class="gmail-scan-cta">
+                        <button class="btn btn-primary btn-lg" onclick="navigateTo('gmail-scan')">
+                            <i class="fas fa-satellite-dish"></i> Scan for Applications
+                        </button>
+                        <p class="scan-cta-hint">
+                            <i class="fas fa-info-circle"></i> Scan your Gmail accounts for job applications
+                        </p>
+                    </div>
+                                        <thead>
+                                            <tr>
+                                                <th>Company</th>
+                                                <th>Role</th>
+                                                <th>Platform</th>
+                                                <th>Status</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                                <div class="results-actions">
+                                    <button class="btn btn-primary" id="viewImportedAppsBtn">
+                                        <i class="fas fa-list"></i> View All Applications
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== GMAIL SCAN VIEW ===== -->
+            <section id="gmailScanView" class="view">
+                <div class="gmail-section">
+                    <!-- Info Banner -->
+                    <div class="info-banner">
+                        <div class="info-banner-icon">
+                            <i class="fas fa-satellite-dish"></i>
+                        </div>
+                        <div class="info-banner-content">
+                            <h3>Scan Your Gmail for Job Applications</h3>
+                            <p>
+                                <strong>🔍 Smart Detection:</strong> We automatically find and import applications from LinkedIn, Naukri, Indeed, Glassdoor, Wellfound, and 10+ other platforms.
+                            </p>
+                            <p class="info-banner-tip">
+                                <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Enable Gmail accounts in the Gmail Import tab before scanning.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="gmail-card">
                         <div class="gmail-card-header">
                             <h2><i class="fas fa-satellite-dish"></i> Scan for Applications</h2>
                         </div>
@@ -1100,26 +1154,22 @@
                                     <table class="app-table" id="scanResultsTable">
                                         <thead>
                                             <tr>
+                                                <th>Platform</th>
                                                 <th>Company</th>
                                                 <th>Role</th>
-                                                <th>Platform</th>
                                                 <th>Status</th>
                                                 <th>Date</th>
                                             </tr>
                                         </thead>
-                                        <tbody></tbody>
+                                        <tbody id="scanResultsTableBody"></tbody>
                                     </table>
-                                </div>
-                                <div class="results-actions">
-                                    <button class="btn btn-primary" id="viewImportedAppsBtn">
-                                        <i class="fas fa-list"></i> View All Applications
-                                    </button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
+
         </main>
     </div>
 

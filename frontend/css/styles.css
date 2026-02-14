@@ -2461,6 +2461,44 @@ textarea:focus-visible {
 .gmail-card-header h2 i { color: #ea4335; margin-right: 10px; }
 .gmail-card-body { padding: 24px; }
 
+/* Gmail Scan CTA */
+.gmail-scan-cta {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    margin-top: 24px;
+    box-shadow: 0 4px 12px rgba(88, 80, 236, 0.2);
+}
+
+.gmail-scan-cta .btn-lg {
+    background: white;
+    color: var(--accent-blue);
+    font-weight: 600;
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.gmail-scan-cta .btn-lg:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.scan-cta-hint {
+    color: rgba(255, 255, 255, 0.9);
+    margin-top: 16px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.scan-cta-hint i {
+    color: rgba(255, 255, 255, 0.7);
+}
+
 .gmail-description { color: var(--text-secondary); line-height: 1.7; margin-bottom: 24px; font-size: 0.95rem; }
 
 /* Info Banner */

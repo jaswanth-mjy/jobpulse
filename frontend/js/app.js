@@ -1386,6 +1386,7 @@ function setView(name) {
         views.applications = $("#applicationsView");
         views.add = $("#addView");
         views.gmail = $("#gmailView");
+        views.gmailScan = $("#gmailScanView");
     }
 
     Object.values(views).forEach((v) => v?.classList.remove("active"));
@@ -1394,10 +1395,21 @@ function setView(name) {
     $$(".nav-item").forEach((n) => n.classList.remove("active"));
     $(`.nav-item[data-view="${name}"]`)?.classList.add("active");
 
-    const titles = { dashboard: "Dashboard", applications: "Applications", add: "Add Application", gmail: "Gmail Import" };
+    const titles = { 
+        dashboard: "Dashboard", 
+        applications: "Applications", 
+        add: "Add Application", 
+        gmail: "Gmail Import",
+        gmailScan: "Gmail Scan"
+    };
     $("#pageTitle").textContent = titles[name] || "";
 
     $(".sidebar").classList.remove("open");
+}
+
+// Navigation helper
+function navigateTo(viewName) {
+    setView(viewName);
 }
 
 // ========== DASHBOARD ==========
