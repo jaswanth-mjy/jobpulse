@@ -15,8 +15,9 @@ let allApplications = [];
 let invalidApplications = []; // Track applications that failed validation
 let platforms = [];
 let statuses = [];
-let authToken = localStorage.getItem("jobpulse_token") || null;
-let currentUser = JSON.parse(localStorage.getItem("jobpulse_user") || "null");
+// Check sessionStorage first (current session), then localStorage (remember me)
+let authToken = sessionStorage.getItem("jobpulse_token") || localStorage.getItem("jobpulse_token") || null;
+let currentUser = JSON.parse(sessionStorage.getItem("jobpulse_user") || localStorage.getItem("jobpulse_user") || "null");
 let recentlyUpdatedIds = new Set(); // Track recently updated applications
 let recentlyImportedIds = new Set(); // Track recently imported applications
 
@@ -277,8 +278,9 @@ async function handleGoogleCallback(event) {
         if (res.ok) {
             authToken = data.token;
             currentUser = data.user;
-            localStorage.setItem("jobpulse_token", authToken);
-            localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            // Use session storage for Google OAuth (temporary) - user can use "Remember me" on next signin
+            sessionStorage.setItem("jobpulse_token", authToken);
+            sessionStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
             hideAuth();
             showApp();
             showToast(`Welcome, ${data.user.name}! 🎉`, "success");
@@ -321,8 +323,9 @@ async function handleSignUp(e) {
         if (res.ok) {
             authToken = data.token;
             currentUser = data.user;
-            localStorage.setItem("jobpulse_token", authToken);
-            localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            // Use session storage for signup (temporary) - user can use "Remember me" on next signin
+            sessionStorage.setItem("jobpulse_token", authToken);
+            sessionStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
             
             // Check if email verification is pending (only on signup)
             if (data.pending_verification) {
@@ -360,6 +363,7 @@ async function handleSignIn(e) {
 
     const email = $("#signinEmail").value.trim();
     const password = $("#signinPassword").value;
+    const rememberMe = $("#rememberMe").checked;
 
     try {
         const res = await fetch(`${API}/auth/signin`, {
@@ -372,8 +376,17 @@ async function handleSignIn(e) {
         if (res.ok) {
             authToken = data.token;
             currentUser = data.user;
-            localStorage.setItem("jobpulse_token", authToken);
-            localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            
+            // Store based on remember me preference
+            if (rememberMe) {
+                // Persistent storage - survives browser close
+                localStorage.setItem("jobpulse_token", authToken);
+                localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            } else {
+                // Session storage - cleared when tab closes
+                sessionStorage.setItem("jobpulse_token", authToken);
+                sessionStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+            }
             
             // Check if email verification is pending (backend explicitly requires it)
             console.log("🔍 Sign-in response:", { pending_verification: data.pending_verification, email_sent: data.email_sent });
@@ -420,6 +433,9 @@ function handleLogout() {
 function clearAuth() {
     authToken = null;
     currentUser = null;
+    // Clear both session and persistent storage
+    sessionStorage.removeItem("jobpulse_token");
+    sessionStorage.removeItem("jobpulse_user");
     localStorage.removeItem("jobpulse_token");
     localStorage.removeItem("jobpulse_user");
 }
@@ -653,12 +669,24 @@ async function handleVerifyEmail() {
         if (res.ok) {
             // Update token with verified status
             authToken = data.token;
-            localStorage.setItem("jobpulse_token", authToken);
+            
+            // Update in both storages in case user used remember me
+            if (sessionStorage.getItem("jobpulse_token")) {
+                sessionStorage.setItem("jobpulse_token", authToken);
+            }
+            if (localStorage.getItem("jobpulse_token")) {
+                localStorage.setItem("jobpulse_token", authToken);
+            }
             
             // Update currentUser with verified status
             if (currentUser) {
                 currentUser.email_verified = true;
-                localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+                if (sessionStorage.getItem("jobpulse_user")) {
+                    sessionStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+                }
+                if (localStorage.getItem("jobpulse_user")) {
+                    localStorage.setItem("jobpulse_user", JSON.stringify(currentUser));
+                }
             }
             
             showVerificationSuccess("✅ Email verified successfully!");

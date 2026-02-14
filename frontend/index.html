@@ -314,7 +314,11 @@
                         <label><i class="fas fa-lock"></i> Password</label>
                         <input type="password" id="signinPassword" required placeholder="••••••••" minlength="6">
                     </div>
-                    <div style="text-align: right; margin-top: -10px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: -10px; margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: var(--text-secondary);">
+                            <input type="checkbox" id="rememberMe" style="cursor: pointer;">
+                            <span>Remember me</span>
+                        </label>
                         <a href="#" onclick="showAuth('forgot'); return false;" style="color: #6366f1; font-size: 14px; text-decoration: none;">
                             Forgot password?
                         </a>
