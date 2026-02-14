@@ -1002,6 +1002,12 @@ async function refreshData(resetPagination = true) {
             console.warn(`⚠️ ${invalidApplications.length} applications failed validation and are hidden from dashboard`);
             console.warn("Invalid applications:", invalidApplications.map(app => `${app.company} - ${app.role}`));
             showValidationWarning(invalidApplications.length);
+            
+            // Show prominent toast notification
+            showToast(
+                `⚠️ ${invalidApplications.length} application(s) hidden due to validation issues. Click "View & Fix" in dashboard to review.`,
+                "warning"
+            );
         } else if (resetPagination) {
             // Clear any existing validation warning
             const existing = $("#validationWarning");

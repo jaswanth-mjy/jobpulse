@@ -401,7 +401,79 @@ PLATFORM_PATTERNS = {
         "body_patterns": [
             r"applied for\s+(.+?)\s+at\s+(.+?)[\.\n]",
         ],
-    },    "Workday": {
+    },
+    "Dice": {
+        "senders": [
+            "noreply@dice.com",
+            "notifications@dice.com",
+        ],
+        "subject_patterns": [
+            r"[Yy]ou applied to (.+?) at (.+)",
+            r"[Yy]our application for (.+?) at (.+)",
+        ],
+        "body_patterns": [
+            r"applied (?:for|to)\s+(.+?)\s+at\s+(.+?)[\.\n]",
+            r"[Pp]osition\s*:\s*(.+?)[\n\r]",
+            r"[Cc]ompany\s*:\s*(.+?)[\n\r]",
+        ],
+    },
+    "CareerBuilder": {
+        "senders": [
+            "noreply@careerbuilder.com",
+            "notifications@careerbuilder.com",
+        ],
+        "subject_patterns": [
+            r"[Yy]ou applied for (.+?) at (.+)",
+            r"[Aa]pplication confirmation.+?(.+?) at (.+)",
+        ],
+        "body_patterns": [
+            r"applied for\s+(?:the\s+)?(.+?)\s+at\s+(.+?)[\.\n]",
+            r"[Jj]ob\s+[Tt]itle\s*:\s*(.+?)[\n\r]",
+            r"[Cc]ompany\s*:\s*(.+?)[\n\r]",
+        ],
+    },
+    "SimplyHired": {
+        "senders": [
+            "noreply@simplyhired.com",
+        ],
+        "subject_patterns": [
+            r"[Yy]ou applied for (.+?) at (.+)",
+        ],
+        "body_patterns": [
+            r"applied for\s+(.+?)\s+at\s+(.+?)[\.\n]",
+        ],
+    },
+    "Greenhouse": {
+        "senders": [
+            "greenhouse.io",
+            "grnh.se",
+            "noreply@greenhouse.io",
+        ],
+        "subject_patterns": [
+            r"[Yy]our application to (.+?) at (.+)",
+            r"[Aa]pplication (?:received|submitted).+?(.+?)(?:\s+at\s+(.+?))?",
+        ],
+        "body_patterns": [
+            r"applied (?:for|to)\s+(?:the\s+)?(?:position\s+of\s+)?(.+?)\s+at\s+(.+?)[.,\n]",
+            r"[Pp]osition\s*:\s*(.+?)[\n\r]",
+            r"[Cc]ompany\s*:\s*(.+?)[\n\r]",
+        ],
+    },
+    "Lever": {
+        "senders": [
+            "lever.co",
+            "jobs@lever.co",
+            "noreply@lever.co",
+        ],
+        "subject_patterns": [
+            r"[Yy]ou applied to (.+?) at (.+)",
+            r"[Aa]pplication (?:received|confirmation).+?(.+?) at (.+)",
+        ],
+        "body_patterns": [
+            r"applied (?:for|to)\s+(.+?)\s+at\s+(.+?)[\.\n]",
+        ],
+    },
+    "Workday": {
         "senders": [
             "myworkday.com",
             "myworkdayjobs.com",
@@ -937,75 +1009,108 @@ def _should_reject(subject):
 def _extract_from_subject(subject, platform):
     """Try to extract role and company from the subject line."""
     result = {"company": None, "role": None}
-    patterns = []
-    if platform and platform in PLATFORM_PATTERNS:
-        patterns = PLATFORM_PATTERNS[platform]["subject_patterns"]
-    for pat in patterns:
-        m = re.search(pat, subject, re.IGNORECASE)
-        if m:
-            gd = m.groupdict()
-            if gd:
-                # Named groups — use them directly
-                if gd.get("company"):
-                    result["company"] = _clean(gd["company"])
-                if gd.get("role"):
-                    result["role"] = _clean(gd["role"])
-            else:
-                # Positional groups (legacy / non-LinkedIn platforms)
-                groups = m.groups()
-                if len(groups) >= 2:
-                    result["role"] = _clean(groups[0])
-                    result["company"] = _clean(groups[1])
-                elif len(groups) == 1:
-                    result["role"] = _clean(groups[0])
-            break
+    
+    if not subject:
+        return result
+    
+    try:
+        patterns = []
+        if platform and platform in PLATFORM_PATTERNS:
+            patterns = PLATFORM_PATTERNS[platform]["subject_patterns"]
+        
+        for pat in patterns:
+            try:
+                m = re.search(pat, subject, re.IGNORECASE)
+                if m:
+                    gd = m.groupdict()
+                    if gd:
+                        # Named groups — use them directly
+                        if gd.get("company"):
+                            result["company"] = _clean(gd["company"])
+                        if gd.get("role"):
+                            result["role"] = _clean(gd["role"])
+                    else:
+                        # Positional groups (legacy / non-LinkedIn platforms)
+                        groups = m.groups()
+                        if len(groups) >= 2:
+                            result["role"] = _clean(groups[0])
+                            result["company"] = _clean(groups[1])
+                        elif len(groups) == 1:
+                            result["role"] = _clean(groups[0])
+                    break
+            except Exception as e:
+                # Log and continue with next pattern
+                print(f"  ⚠️ Pattern match error in subject: {e}")
+                continue
+    except Exception as e:
+        print(f"  ⚠️ Error extracting from subject: {e}")
+    
     return result
 
 
 def _extract_from_body(body, platform):
     """Try to extract role, company, location from the email body."""
     result = {"company": None, "role": None, "location": None}
-    clean_body = _strip_html(body)
-    patterns = []
-    if platform and platform in PLATFORM_PATTERNS:
-        patterns = PLATFORM_PATTERNS[platform]["body_patterns"]
-    for pat in patterns:
-        m = re.search(pat, clean_body, re.IGNORECASE)
-        if m:
-            gd = m.groupdict()
-            if gd:
-                # Named groups — use them directly
-                if gd.get("role"):
-                    result["role"] = _clean(gd["role"])
-                if gd.get("company"):
-                    result["company"] = _clean(gd["company"])
-                if result["role"] or result["company"]:
+    
+    if not body:
+        return result
+    
+    try:
+        clean_body = _strip_html(body)
+        patterns = []
+        if platform and platform in PLATFORM_PATTERNS:
+            patterns = PLATFORM_PATTERNS[platform]["body_patterns"]
+        
+        for pat in patterns:
+            try:
+                m = re.search(pat, clean_body, re.IGNORECASE)
+                if m:
+                    gd = m.groupdict()
+                    if gd:
+                        # Named groups — use them directly
+                        if gd.get("role"):
+                            result["role"] = _clean(gd["role"])
+                        if gd.get("company"):
+                            result["company"] = _clean(gd["company"])
+                        if result["role"] or result["company"]:
+                            break
+                    else:
+                        # Positional groups (legacy)
+                        groups = m.groups()
+                        if len(groups) >= 2:
+                            result["role"] = _clean(groups[0])
+                            result["company"] = _clean(groups[1])
+                            break
+                        elif len(groups) == 1:
+                            val = _clean(groups[0])
+                            if val:
+                                if not result["role"]:
+                                    result["role"] = val
+                                elif not result["company"]:
+                                    result["company"] = val
+            except Exception as e:
+                # Log and continue with next pattern
+                print(f"  ⚠️ Pattern match error in body: {e}")
+                continue
+        
+        # Extract location with error handling
+        for pat in [
+            r"[Ll]ocation\s*:\s*(.+?)[\n\r]",
+            r"[Ll]ocated\s+in\s+(.+?)[\.\n]",
+            r"[Jj]ob\s+[Ll]ocation\s*:\s*(.+?)[\n\r]",
+        ]:
+            try:
+                m = re.search(pat, clean_body)
+                if m:
+                    loc = _clean(m.group(1))
+                    if loc and not _is_garbage(loc):
+                        result["location"] = loc
                     break
-            else:
-                # Positional groups (legacy)
-                groups = m.groups()
-                if len(groups) >= 2:
-                    result["role"] = _clean(groups[0])
-                    result["company"] = _clean(groups[1])
-                    break
-                elif len(groups) == 1:
-                    val = _clean(groups[0])
-                    if val:
-                        if not result["role"]:
-                            result["role"] = val
-                        elif not result["company"]:
-                            result["company"] = val
-    for pat in [
-        r"[Ll]ocation\s*:\s*(.+?)[\n\r]",
-        r"[Ll]ocated\s+in\s+(.+?)[\.\n]",
-        r"[Jj]ob\s+[Ll]ocation\s*:\s*(.+?)[\n\r]",
-    ]:
-        m = re.search(pat, clean_body)
-        if m:
-            loc = _clean(m.group(1))
-            if loc and not _is_garbage(loc):
-                result["location"] = loc
-            break
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"  ⚠️ Error extracting from body: {e}")
+    
     return result
 
 
@@ -1269,8 +1374,13 @@ def parse_email(sender, subject, body, date_str):
     if _is_garbage(company) and _is_garbage(role):
         return None
 
-    company = company or "Unknown Company"
-    role = role or "Unknown Role"
+    # REJECT entries with Unknown Company/Role - better to skip than import bad data
+    if not company or company.lower() in ["unknown company", "unknown"]:
+        print(f"⚠️ Rejecting email with unknown company: '{subject[:50]}...'")
+        return None
+    if not role or role.lower() in ["unknown role", "unknown"]:
+        print(f"⚠️ Rejecting email with unknown role: '{subject[:50]}...'")
+        return None
 
     # Determine platform: known platform > ATS detection > Company Website
     if not platform:

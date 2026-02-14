@@ -398,19 +398,30 @@ def _scan_single_account(account: dict, days_back: int, max_results: int) -> lis
                 applied_date = datetime.now().strftime("%Y-%m-%d")
 
             body = get_email_body(msg)
-            app = parse_email(sender, subject, body, applied_date)
+            
+            # Parse email with error handling
+            try:
+                app = parse_email(sender, subject, body, applied_date)
+            except Exception as parse_error:
+                print(f"  ⚠️ Parse error for '{subject[:50]}...': {type(parse_error).__name__}: {parse_error}")
+                continue
 
             if app:
                 key = f"{app['company'].lower().strip()}_{app['role'].lower().strip()}"
                 if key not in seen:
                     seen.add(key)
                     parsed_applications.append(app)
-                    print(f"  ✅ {app['platform']}: {app['role']} at {app['company']}")
+                    print(f"  ✅ {app['platform']}: {app['role']} at {app['company']} ({app['status']})")
             else:
-                print(f"  ⏭️ Skipped: [{sender[:50]}] {subject[:80]}")
+                # More detailed skip logging for debugging
+                if subject and sender:
+                    sender_display = sender.split('<')[0][:30] if '<' in sender else sender[:30]
+                    print(f"  ⏭️  Skipped: {subject[:60]}... (from {sender_display})")
+                else:
+                    print(f"  ⏭️  Skipped: Unable to parse email")
 
         except Exception as e:
-            print(f"  ⚠️ Error processing email: {e}")
+            print(f"  ⚠️ Error processing email: {type(e).__name__}: {e}")
             continue
 
     mail.logout()
