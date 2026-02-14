@@ -877,6 +877,65 @@ def delete_application(app_id):
     return jsonify({"message": "Application deleted!"})
 
 
+@app.route("/api/applications/<app_id>/report", methods=["POST"])
+@require_auth
+@require_verified_email
+def report_application(app_id):
+    """Report an application with a reason and optional notes."""
+    db = get_db()
+    
+    # Verify application exists and belongs to user
+    app = db.applications.find_one({"_id": ObjectId(app_id), "user_id": ObjectId(g.user_id)})
+    if not app:
+        return jsonify({"error": "Application not found"}), 404
+    
+    data = request.get_json()
+    reason = data.get("reason", "").strip()
+    notes = data.get("notes", "").strip()
+    
+    if not reason:
+        return jsonify({"error": "Report reason is required"}), 400
+    
+    # Create report document
+    report_doc = {
+        "application_id": ObjectId(app_id),
+        "user_id": ObjectId(g.user_id),
+        "reason": reason,
+        "notes": notes,
+        "reported_date": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "pending",
+        "application_snapshot": {
+            "company": app.get("company"),
+            "role": app.get("role"),
+            "platform": app.get("platform"),
+            "applied_date": app.get("applied_date")
+        }
+    }
+    
+    result = db.reports.insert_one(report_doc)
+    
+    return jsonify({
+        "message": "Application reported successfully!",
+        "report_id": str(result.inserted_id)
+    })
+
+
+@app.route("/api/reports", methods=["GET"])
+@require_auth
+@require_verified_email
+def get_reports():
+    """Get all reports submitted by the current user."""
+    db = get_db()
+    reports = list(db.reports.find({"user_id": ObjectId(g.user_id)}).sort("reported_date", -1))
+    
+    for report in reports:
+        report["id"] = str(report.pop("_id"))
+        report["application_id"] = str(report["application_id"])
+        report["user_id"] = str(report["user_id"])
+    
+    return jsonify({"reports": reports})
+
+
 @app.route("/api/applications/clear/all", methods=["DELETE"])
 @require_auth
 @require_verified_email

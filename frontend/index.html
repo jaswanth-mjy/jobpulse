@@ -1128,6 +1128,52 @@
             </div>
             <div class="modal-body" id="modalBody"></div>
         </div>
+
+        <!-- ===== REPORT MODAL ===== -->
+        <div class="modal" id="reportModal">
+            <div class="modal-header">
+                <h3><i class="fas fa-flag"></i> Report Application</h3>
+                <button class="modal-close" id="reportModalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="reportForm" onsubmit="handleReportSubmit(event)">
+                    <input type="hidden" id="reportAppId">
+                    
+                    <div class="form-group">
+                        <label for="reportAppInfo" class="form-label">Application</label>
+                        <div id="reportAppInfo" class="report-app-info"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reportReason" class="form-label">Reason <span class="required">*</span></label>
+                        <select id="reportReason" class="form-control" required>
+                            <option value="">Select a reason...</option>
+                            <option value="Duplicate Entry">Duplicate Entry</option>
+                            <option value="Incorrect Information">Incorrect Information</option>
+                            <option value="Spam/Fake Application">Spam/Fake Application</option>
+                            <option value="Wrong Platform">Wrong Platform</option>
+                            <option value="Import Error">Import Error (from Gmail scan)</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reportNotes" class="form-label">Additional Details (Optional)</label>
+                        <textarea id="reportNotes" class="form-control" rows="4" 
+                            placeholder="Please provide more details about why you're reporting this application..."></textarea>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeReportModal()">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-flag"></i> Submit Report
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- ===== TOAST ===== -->
