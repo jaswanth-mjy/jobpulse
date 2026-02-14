@@ -1673,6 +1673,9 @@ async function deleteApplication(id) {
 
 // ========== REPORT APPLICATION ==========
 function reportApplication(id, company, role, platform) {
+    // Hide application details modal if open
+    $("#appModal").style.display = "none";
+    
     $("#reportAppId").value = id;
     $("#reportAppInfo").innerHTML = `
         <div style="padding:12px;background:var(--surface-color);border-radius:8px;border-left:3px solid var(--warning-color);">
@@ -1688,8 +1691,8 @@ function reportApplication(id, company, role, platform) {
 }
 
 function closeReportModal() {
-    $("#modalOverlay").classList.remove("active");
     $("#reportModal").style.display = "none";
+    $("#modalOverlay").classList.remove("active");
     $("#reportForm").reset();
 }
 
@@ -1784,6 +1787,9 @@ async function viewApplication(id) {
 
         $("#modalBody").innerHTML = detailsHTML;
 
+        // Hide report modal if open and show app modal
+        $("#reportModal").style.display = "none";
+        $("#appModal").style.display = "block";
         $("#modalOverlay").classList.add("active");
     } catch (e) {
         showToast("Failed to load details", "error");
@@ -1791,6 +1797,7 @@ async function viewApplication(id) {
 }
 
 function closeModal() {
+    $("#appModal").style.display = "none";
     $("#modalOverlay").classList.remove("active");
 }
 
