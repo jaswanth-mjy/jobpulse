@@ -1,0 +1,38 @@
+{
+  "name": "jobpulse",
+  "version": "1.0.0",
+  "description": "Job Application Tracker with Gmail Integration and Google OAuth",
+  "main": "api/index.py",
+  "scripts": {
+    "dev": "cd backend && python app.py",
+    "start": "cd backend && gunicorn app:app",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel",
+    "setup:vercel": "bash setup-vercel.sh",
+    "secrets": "bash vercel-secrets.sh",
+    "test": "cd backend && python -m pytest",
+    "lint": "cd backend && pylint *.py",
+    "format": "cd backend && black .",
+    "validate": "python -m py_compile backend/*.py"
+  },
+  "keywords": [
+    "job-tracker",
+    "application-tracker",
+    "gmail",
+    "oauth",
+    "flask",
+    "mongodb"
+  ],
+  "author": "JobPulse Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jaswanth-mjy/jobpulse.git"
+  },
+  "engines": {
+    "node": ">=18.x",
+    "npm": ">=9.x"
+  },
+  "devDependencies": {},
+  "dependencies": {}
+}
