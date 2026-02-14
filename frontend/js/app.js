@@ -1300,8 +1300,14 @@ function setupEventListeners() {
     // Modal close
     $("#modalClose").addEventListener("click", closeModal);
     $("#modalOverlay").addEventListener("click", (e) => {
-        if (e.target === $("#modalOverlay")) closeModal();
+        if (e.target === $("#modalOverlay")) {
+            closeModal();
+            closeReportModal();
+        }
     });
+
+    // Report modal close
+    $("#reportModalClose").addEventListener("click", closeReportModal);
 
     // Mobile menu
     $("#menuToggle").addEventListener("click", () => {
@@ -1552,6 +1558,9 @@ function renderApplicationsTable() {
                     <button class="action-btn" title="Edit" onclick="editApplication('${app.id}')">
                         <i class="fas fa-pen"></i>
                     </button>
+                    <button class="action-btn report" title="Report Issue" onclick="reportApplication('${app.id}', '${esc(app.company)}', '${esc(app.role)}', '${esc(app.platform)}')">
+                        <i class="fas fa-flag"></i>
+                    </button>
                     <button class="action-btn delete" title="Delete" onclick="deleteApplication('${app.id}')">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -1659,6 +1668,59 @@ async function deleteApplication(id) {
         }
     } catch (e) {
         showToast("Network error", "error");
+    }
+}
+
+// ========== REPORT APPLICATION ==========
+function reportApplication(id, company, role, platform) {
+    $("#reportAppId").value = id;
+    $("#reportAppInfo").innerHTML = `
+        <div style="padding:12px;background:var(--surface-color);border-radius:8px;border-left:3px solid var(--warning-color);">
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px;">${company}</div>
+            <div style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:2px;">${role}</div>
+            <div style="font-size:0.85rem;color:var(--text-muted);">${platform}</div>
+        </div>
+    `;
+    $("#reportReason").value = "";
+    $("#reportNotes").value = "";
+    $("#modalOverlay").classList.add("active");
+    $("#reportModal").style.display = "block";
+}
+
+function closeReportModal() {
+    $("#modalOverlay").classList.remove("active");
+    $("#reportModal").style.display = "none";
+    $("#reportForm").reset();
+}
+
+async function handleReportSubmit(e) {
+    e.preventDefault();
+    
+    const appId = $("#reportAppId").value;
+    const reason = $("#reportReason").value;
+    const notes = $("#reportNotes").value.trim();
+    
+    if (!reason) {
+        showToast("Please select a reason", "error");
+        return;
+    }
+    
+    try {
+        const res = await authFetch(`${API}/applications/${appId}/report`, {
+            method: "POST",
+            body: JSON.stringify({ reason, notes })
+        });
+        
+        const result = await res.json();
+        
+        if (res.ok) {
+            showToast("Report submitted successfully! Thank you for your feedback.", "success");
+            closeReportModal();
+        } else {
+            showToast(result.error || "Failed to submit report", "error");
+        }
+    } catch (e) {
+        showToast("Network error. Please try again.", "error");
     }
 }
 

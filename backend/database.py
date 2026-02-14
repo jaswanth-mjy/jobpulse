@@ -64,6 +64,10 @@ def init_db():
     # Gmail config collection
     db.gmail_config.create_index("user_id")
 
+    # Reports collection — index by user and application
+    db.reports.create_index([("user_id", 1), ("reported_date", -1)])
+    db.reports.create_index("application_id")
+
     print("✅ MongoDB indexes ensured!")
 
 
