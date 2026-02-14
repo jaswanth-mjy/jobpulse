@@ -1302,16 +1302,16 @@ function setupEventListeners() {
     });
 
     // Quick add
-    $("#quickAddBtn").addEventListener("click", () => {
+    $("#quickAddBtn")?.addEventListener("click", () => {
         resetForm();
         setView("add");
     });
 
     // Form submit
-    $("#applicationForm").addEventListener("submit", handleFormSubmit);
+    $("#applicationForm")?.addEventListener("submit", handleFormSubmit);
 
     // Cancel
-    $("#cancelBtn").addEventListener("click", () => setView("applications"));
+    $("#cancelBtn")?.addEventListener("click", () => setView("applications"));
 
     // Filters (reset pagination when filters change)
     ["filterPlatform", "filterStatus", "sortBy", "sortOrder"].forEach((id) => {
@@ -1320,14 +1320,14 @@ function setupEventListeners() {
 
     // Search (debounced, reset pagination)
     let searchTimer;
-    $("#globalSearch").addEventListener("input", () => {
+    $("#globalSearch")?.addEventListener("input", () => {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => refreshData(true), 350);
     });
 
     // Modal close
-    $("#modalClose").addEventListener("click", closeModal);
-    $("#modalOverlay").addEventListener("click", (e) => {
+    $("#modalClose")?.addEventListener("click", closeModal);
+    $("#modalOverlay")?.addEventListener("click", (e) => {
         if (e.target === $("#modalOverlay")) {
             closeModal();
             closeReportModal();
@@ -1335,10 +1335,10 @@ function setupEventListeners() {
     });
 
     // Report modal close
-    $("#reportModalClose").addEventListener("click", closeReportModal);
+    $("#reportModalClose")?.addEventListener("click", closeReportModal);
 
     // Mobile menu
-    $("#menuToggle").addEventListener("click", () => {
+    $("#menuToggle")?.addEventListener("click", () => {
         const sidebar = $(".sidebar");
         const overlay = $("#sidebarOverlay");
         sidebar.classList.toggle("open");
@@ -1365,9 +1365,9 @@ function setupEventListeners() {
     });
 
     // Gmail
-    $("#scanGmailBtn").addEventListener("click", () => setView("gmail"));
-    $("#startScanBtn").addEventListener("click", startGmailScan);
-    $("#viewImportedAppsBtn").addEventListener("click", () => {
+    $("#scanGmailBtn")?.addEventListener("click", () => setView("gmail"));
+    $("#startScanBtn")?.addEventListener("click", startGmailScan);
+    $("#viewImportedAppsBtn")?.addEventListener("click", () => {
         setView("applications");
         showToast("Showing imported applications", "info");
     });
