@@ -2271,11 +2271,14 @@ function setupGmailForm() {
     // Check OAuth availability on load
     checkOAuthStatus();
 
-    // Show auth method selection when clicking "Add Account"
+    // Show app password form directly when clicking "Add Account" (since OAuth is disabled)
     $("#showAddAccountBtn")?.addEventListener("click", async () => {
-        await checkOAuthStatus(); // Refresh OAuth status
-        authMethodCard.style.display = "block";
-        setupCard.style.display = "none";
+        // Skip auth method selection and go directly to app password form
+        authMethodCard.style.display = "none";
+        setupCard.style.display = "block";
+        $("#gmailEmail").value = "";
+        $("#gmailAppPassword").value = "";
+        $("#gmailEmail").focus();
     });
 
     // Cancel from auth method selection
