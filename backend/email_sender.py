@@ -1,6 +1,7 @@
 """
 Email Sender Utility for JobPulse
 Handles sending verification emails and notifications
+Supports Gmail API (HTTPS) with SMTP fallback
 """
 
 import smtplib
@@ -20,8 +21,44 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
 FROM_NAME = os.getenv("FROM_NAME", "JobPulse")
 
 
+def _get_admin_gmail_credentials():
+    """Get Gmail OAuth credentials from admin user in DB for sending via Gmail API (HTTPS)."""
+    try:
+        from database import db
+        ADMIN_EMAILS = [os.getenv("ADMIN_EMAIL", "shramkavach@gmail.com")]
+        for admin_email in ADMIN_EMAILS:
+            admin_user = db.users.find_one({"email": admin_email})
+            if admin_user:
+                gmail_accounts = admin_user.get("gmail_accounts", [])
+                for account in gmail_accounts:
+                    creds = account.get("credentials", {})
+                    if creds and creds.get("refresh_token"):
+                        print(f"✅ Found Gmail OAuth credentials from admin {account.get('email', admin_email)}")
+                        return creds
+    except Exception as e:
+        print(f"⚠️  Could not fetch admin Gmail credentials: {e}")
+    return None
+
+
+def _send_via_gmail_api(to_email: str, subject: str, html_content: str, text_content: str = "", bcc_list: list = None) -> bool:
+    """Send email via Gmail API (HTTPS-based, works when SMTP ports are blocked)."""
+    gmail_creds = _get_admin_gmail_credentials()
+    if not gmail_creds:
+        return False
+    
+    try:
+        from gmail_oauth import credentials_from_dict, refresh_credentials_if_needed, send_email_via_gmail_api
+        credentials, _ = refresh_credentials_if_needed(gmail_creds)
+        result = send_email_via_gmail_api(credentials, to_email, subject, html_content, text_content, bcc_list=bcc_list)
+        return result
+    except Exception as e:
+        print(f"⚠️  Gmail API send failed: {e}")
+        return False
+
+
 def _get_smtp_connection():
     """Get SMTP connection, trying SSL on 465 first (more reliable), then STARTTLS on 587."""
+    ssl_error = None
     # Try SSL on port 465 first (more reliable, works on most networks)
     try:
         server = smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=15)
@@ -29,6 +66,7 @@ def _get_smtp_connection():
         print(f"✅ SMTP connected via SSL (port 465)")
         return server
     except Exception as ssl_err:
+        ssl_error = ssl_err
         print(f"⚠️  SSL port 465 failed: {ssl_err}")
     
     # Fallback to STARTTLS on port 587
@@ -40,7 +78,7 @@ def _get_smtp_connection():
         return server
     except Exception as tls_err:
         print(f"❌ STARTTLS port {SMTP_PORT} also failed: {tls_err}")
-        raise ConnectionError(f"Cannot connect to SMTP server. SSL(465): {ssl_err}, TLS({SMTP_PORT}): {tls_err}")
+        raise ConnectionError(f"Cannot connect to SMTP server. SSL(465): {ssl_error}, TLS({SMTP_PORT}): {tls_err}")
 
 
 def send_verification_email(to_email: str, verification_code: str, user_name: str = "") -> bool:
@@ -55,10 +93,6 @@ def send_verification_email(to_email: str, verification_code: str, user_name: st
     Returns:
         bool: True if email sent successfully, False otherwise
     """
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print("⚠️  Email sending disabled: SMTP credentials not configured in .env")
-        return False
-    
     try:
         # Create message
         msg = MIMEMultipart("alternative")
@@ -297,14 +331,23 @@ JobPulse - Track Your Career Journey
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
+        # Try Gmail API first (HTTPS, works on Render where SMTP is blocked)
+        if _send_via_gmail_api(to_email, msg["Subject"], html_content, text_content):
+            print(f"✅ Verification email sent to {to_email} via Gmail API")
+            return True
+        
+        # Fallback to SMTP
+        if not SMTP_USER or not SMTP_PASSWORD:
+            print("⚠️  Email sending disabled: No Gmail OAuth or SMTP credentials")
+            return False
+        
         server = _get_smtp_connection()
         try:
             server.send_message(msg)
         finally:
             server.quit()
         
-        print(f"✅ Verification email sent to {to_email}")
+        print(f"✅ Verification email sent to {to_email} via SMTP")
         return True
         
     except Exception as e:
@@ -323,9 +366,6 @@ def send_welcome_email(to_email: str, user_name: str = "") -> bool:
     Returns:
         bool: True if email sent successfully, False otherwise
     """
-    if not SMTP_USER or not SMTP_PASSWORD:
-        return False
-    
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = "Welcome to JobPulse! 🎉"
@@ -572,13 +612,23 @@ JobPulse - Track Your Career Journey
         msg.attach(part1)
         msg.attach(part2)
         
+        # Try Gmail API first (HTTPS, works on Render where SMTP is blocked)
+        if _send_via_gmail_api(to_email, msg["Subject"], html_content, text_content):
+            print(f"✅ Welcome email sent to {to_email} via Gmail API")
+            return True
+        
+        # Fallback to SMTP
+        if not SMTP_USER or not SMTP_PASSWORD:
+            print("⚠️  Welcome email skipped: No Gmail OAuth or SMTP credentials")
+            return False
+        
         server = _get_smtp_connection()
         try:
             server.send_message(msg)
         finally:
             server.quit()
         
-        print(f"✅ Welcome email sent to {to_email}")
+        print(f"✅ Welcome email sent to {to_email} via SMTP")
         return True
         
     except Exception as e:
@@ -699,13 +749,23 @@ The JobPulse Team
         msg.attach(part1)
         msg.attach(part2)
         
+        # Try Gmail API first (HTTPS, works on Render where SMTP is blocked)
+        if _send_via_gmail_api(to_email, msg["Subject"], html_content, text_content):
+            print(f"✅ Password reset email sent to {to_email} via Gmail API")
+            return True
+        
+        # Fallback to SMTP
+        if not SMTP_USER or not SMTP_PASSWORD:
+            print("⚠️  Password reset email failed: No Gmail OAuth or SMTP credentials")
+            return False
+        
         server = _get_smtp_connection()
         try:
             server.send_message(msg)
         finally:
             server.quit()
         
-        print(f"✅ Password reset email sent to {to_email}")
+        print(f"✅ Password reset email sent to {to_email} via SMTP")
         return True
         
     except Exception as e:
