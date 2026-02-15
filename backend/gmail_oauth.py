@@ -27,8 +27,11 @@ from email_parser import parse_email
 BASE_DIR = os.path.dirname(__file__)
 CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secrets.json")
 
-# OAuth 2.0 scopes - readonly access to Gmail
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+# OAuth 2.0 scopes - readonly access to Gmail + send emails
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send'
+]
 
 # Redirect URI for OAuth flow
 # For local development, use localhost; for production, use your domain
@@ -195,6 +198,60 @@ def refresh_credentials_if_needed(creds_dict: dict) -> tuple[Credentials, dict |
 def get_gmail_service(credentials: Credentials):
     """Build the Gmail API service."""
     return build('gmail', 'v1', credentials=credentials)
+
+
+def send_email_via_gmail_api(credentials: Credentials, to_email: str, subject: str, 
+                              html_content: str, text_content: str = "") -> bool:
+    """
+    Send an email using Gmail API (HTTPS-based, works even when SMTP is blocked).
+    
+    Args:
+        credentials: OAuth credentials with gmail.send scope
+        to_email: Recipient email address
+        subject: Email subject
+        html_content: HTML email body
+        text_content: Plain text email body (optional)
+        
+    Returns:
+        bool: True if sent successfully, False otherwise
+    """
+    try:
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        service = get_gmail_service(credentials)
+        
+        # Create the email message
+        message = MIMEMultipart('alternative')
+        message['To'] = to_email
+        message['Subject'] = subject
+        
+        # Add text and HTML parts
+        if text_content:
+            part1 = MIMEText(text_content, 'plain')
+            message.attach(part1)
+        
+        part2 = MIMEText(html_content, 'html')
+        message.attach(part2)
+        
+        # Encode the message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+        
+        # Send the email
+        result = service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        print(f"✅ Email sent via Gmail API to {to_email}, Message ID: {result.get('id')}")
+        return True
+        
+    except HttpError as e:
+        print(f"❌ Gmail API error sending to {to_email}: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Error sending email via Gmail API to {to_email}: {e}")
+        return False
 
 
 def get_user_email(credentials: Credentials) -> str:

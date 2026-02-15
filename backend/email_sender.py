@@ -687,7 +687,7 @@ The JobPulse Team
         return False
 
 
-def send_bulk_announcement_email(recipients: list, subject: str, message: str, sender_name: str = "JobPulse Team") -> dict:
+def send_bulk_announcement_email(recipients: list, subject: str, message: str, sender_name: str = "JobPulse Team", gmail_credentials: dict = None) -> dict:
     """
     Send a bulk announcement email to multiple recipients with modern styling
     
@@ -696,13 +696,27 @@ def send_bulk_announcement_email(recipients: list, subject: str, message: str, s
         subject: Email subject line
         message: Email message body (supports basic markdown-like formatting)
         sender_name: Name to show as sender
+        gmail_credentials: Optional Gmail OAuth credentials dict for sending via Gmail API (HTTPS, not blocked)
         
     Returns:
         dict: {'success': int, 'failed': int, 'errors': list}
     """
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print("⚠️  Email sending disabled: SMTP credentials not configured in .env")
-        return {'success': 0, 'failed': len(recipients), 'errors': ['SMTP not configured']}
+    # Check if we have Gmail API credentials (preferred - HTTPS, not blocked on Render)
+    use_gmail_api = gmail_credentials is not None
+    
+    if not use_gmail_api and (not SMTP_USER or not SMTP_PASSWORD):
+        print("⚠️  Email sending disabled: No Gmail OAuth or SMTP credentials configured")
+        return {'success': 0, 'failed': len(recipients), 'errors': ['No email sending method configured. Connect Gmail in admin or add SMTP credentials.']}
+    
+    # Import Gmail OAuth functions if using Gmail API
+    if use_gmail_api:
+        try:
+            from gmail_oauth import credentials_from_dict, refresh_credentials_if_needed, send_email_via_gmail_api
+            credentials, updated_creds = refresh_credentials_if_needed(gmail_credentials)
+            print(f"✅ Using Gmail API for sending (HTTPS-based)")
+        except Exception as e:
+            print(f"❌ Failed to initialize Gmail API: {e}")
+            return {'success': 0, 'failed': len(recipients), 'errors': [f'Gmail API init failed: {str(e)}']}
     
     results = {'success': 0, 'failed': 0, 'errors': []}
     
@@ -915,6 +929,29 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
 </html>
 """
             
+            # Try Gmail API first (HTTPS-based, works on Render)
+            if use_gmail_api:
+                try:
+                    if send_email_via_gmail_api(credentials, to_email, subject, html_content, text_content):
+                        results['success'] += 1
+                        continue
+                    else:
+                        # Gmail API failed, will try SMTP as fallback
+                        print(f"⚠️  Gmail API failed for {to_email}, trying SMTP...")
+                except Exception as gmail_err:
+                    print(f"⚠️  Gmail API error for {to_email}: {gmail_err}, trying SMTP...")
+            
+            # Fall back to SMTP
+            if not SMTP_USER or not SMTP_PASSWORD:
+                results['failed'] += 1
+                results['errors'].append(f"{to_email}: No SMTP fallback available")
+                continue
+                
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
+            msg["To"] = to_email
+            
             part1 = MIMEText(text_content, "plain")
             part2 = MIMEText(html_content, "html")
             msg.attach(part1)
@@ -931,7 +968,7 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
                 try:
                     server = smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=30)
                 except Exception as ssl_err:
-                    raise ConnectionError(f"Cannot connect to SMTP server. Both port {SMTP_PORT} and 465 failed. Your network may be blocking SMTP traffic.")
+                    raise ConnectionError(f"Cannot connect to SMTP server. Both port {SMTP_PORT} and 465 failed. Connect Gmail in admin dashboard to use Gmail API instead.")
             
             try:
                 server.login(SMTP_USER, SMTP_PASSWORD)
@@ -945,9 +982,9 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
             results['failed'] += 1
             results['errors'].append(f"Network Error: {str(e)}")
             print(f"❌ Network error: {e}")
-            # If we can't connect at all, no point trying other recipients
+            # If we can't connect at all, no point trying other recipients via SMTP
             if results['success'] == 0 and results['failed'] == 1:
-                results['errors'].append("Tip: Try using a mobile hotspot or deploy to Render where SMTP is not blocked.")
+                results['errors'].append("Tip: Connect your Gmail account with 'Send' permission in admin dashboard.")
             break
         except smtplib.SMTPAuthenticationError as e:
             results['failed'] += 1

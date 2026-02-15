@@ -2059,15 +2059,28 @@ def admin_send_bulk_email():
         if not recipients:
             return jsonify({"error": "No recipients found matching the filter"}), 400
         
-        # Send emails
-        result = send_bulk_announcement_email(recipients, subject, message)
+        # Try to get admin's Gmail OAuth credentials for sending via Gmail API (works on Render)
+        gmail_credentials = None
+        admin_user = db.users.find_one({"_id": ObjectId(g.user_id)})
+        if admin_user:
+            # Check for connected Gmail accounts with OAuth
+            gmail_accounts = admin_user.get("gmail_accounts", [])
+            for account in gmail_accounts:
+                if account.get("credentials") and account.get("credentials", {}).get("refresh_token"):
+                    gmail_credentials = account["credentials"]
+                    print(f"✅ Found Gmail OAuth credentials for {account.get('email', 'admin')}")
+                    break
+        
+        # Send emails (will use Gmail API if credentials available, otherwise SMTP)
+        result = send_bulk_announcement_email(recipients, subject, message, gmail_credentials=gmail_credentials)
         
         return jsonify({
             "message": f"Bulk email sent",
             "total_recipients": len(recipients),
             "success": result['success'],
             "failed": result['failed'],
-            "errors": result['errors'][:10]  # Limit errors returned
+            "errors": result['errors'][:10],  # Limit errors returned
+            "method": "Gmail API" if gmail_credentials else "SMTP"
         })
         
     except Exception as e:
