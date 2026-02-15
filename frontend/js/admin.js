@@ -16,6 +16,9 @@ const pageLimit = 20;
 // Store users data for detail view
 let usersData = [];
 
+// Store stats data for recipient count
+let statsData = null;
+
 // DOM helpers
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -116,6 +119,9 @@ async function loadStats() {
 
         const data = await res.json();
         console.log("Stats data:", data);
+        
+        // Store for recipient count
+        statsData = data;
 
         // Update stat cards
         $("#totalUsers").textContent = formatNumber(data.total_users);
@@ -128,6 +134,9 @@ async function loadStats() {
         // Update last updated timestamp
         const timestamp = new Date(data.timestamp);
         $("#lastUpdated").textContent = timestamp.toLocaleString();
+        
+        // Update recipient count for bulk email
+        updateRecipientCount();
 
         console.log("Stats loaded successfully");
 
@@ -415,4 +424,130 @@ function formatDateTime(dateStr) {
     } catch {
         return '-';
     }
+}
+
+// ========== BULK EMAIL ==========
+
+// Update recipient count when filter changes
+document.addEventListener("DOMContentLoaded", () => {
+    const recipientSelect = $("#emailRecipients");
+    if (recipientSelect) {
+        recipientSelect.addEventListener("change", updateRecipientCount);
+    }
+    
+    const messageTextarea = $("#emailMessage");
+    if (messageTextarea) {
+        messageTextarea.addEventListener("input", () => {
+            $("#charCount").textContent = messageTextarea.value.length;
+        });
+    }
+    
+    const bulkEmailForm = $("#bulkEmailForm");
+    if (bulkEmailForm) {
+        bulkEmailForm.addEventListener("submit", handleBulkEmailSubmit);
+    }
+});
+
+function updateRecipientCount() {
+    if (!statsData) return;
+    
+    const filter = $("#emailRecipients").value;
+    let count = 0;
+    
+    switch (filter) {
+        case "all":
+            count = statsData.total_users;
+            break;
+        case "verified":
+            count = statsData.verified_users;
+            break;
+        case "unverified":
+            count = statsData.unverified_users;
+            break;
+    }
+    
+    $("#recipientCount").textContent = count;
+    $("#sendCount").textContent = count;
+}
+
+async function handleBulkEmailSubmit(e) {
+    e.preventDefault();
+    previewEmail();
+}
+
+function previewEmail() {
+    const subject = $("#emailSubject").value.trim();
+    const message = $("#emailMessage").value.trim();
+    
+    if (!subject || !message) {
+        showEmailResult("Please fill in subject and message", "error");
+        return;
+    }
+    
+    // Show preview
+    $("#previewSubject").textContent = subject;
+    $("#previewBody").innerHTML = message.replace(/\n/g, '<br>');
+    $("#emailPreviewModal").style.display = "flex";
+}
+
+function closeEmailPreview() {
+    $("#emailPreviewModal").style.display = "none";
+}
+
+async function confirmSendEmail() {
+    const btn = document.querySelector("#emailPreviewModal .btn-primary");
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    
+    const subject = $("#emailSubject").value.trim();
+    const message = $("#emailMessage").value.trim();
+    const filter = $("#emailRecipients").value;
+    
+    try {
+        const res = await fetch(`${API}/admin/send-bulk-email`, {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ subject, message, filter })
+        });
+        
+        const data = await res.json();
+        
+        closeEmailPreview();
+        
+        if (res.ok) {
+            showEmailResult(
+                `✅ Email sent successfully! ${data.success} delivered, ${data.failed} failed.`,
+                data.failed > 0 ? "warning" : "success"
+            );
+            
+            // Clear form on success
+            if (data.failed === 0) {
+                $("#emailSubject").value = "";
+                $("#emailMessage").value = "";
+                $("#charCount").textContent = "0";
+            }
+        } else {
+            showEmailResult(`❌ ${data.error || "Failed to send email"}`, "error");
+        }
+        
+    } catch (error) {
+        closeEmailPreview();
+        showEmailResult(`❌ Network error: ${error.message}`, "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function showEmailResult(message, type) {
+    const result = $("#emailResult");
+    result.textContent = message;
+    result.className = `email-result ${type}`;
+    result.style.display = "block";
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+        result.style.display = "none";
+    }, 10000);
 }

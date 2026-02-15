@@ -685,3 +685,171 @@ The JobPulse Team
     except Exception as e:
         print(f"❌ Failed to send password reset email: {e}")
         return False
+
+
+def send_bulk_announcement_email(recipients: list, subject: str, message: str, sender_name: str = "JobPulse Team") -> dict:
+    """
+    Send a bulk announcement email to multiple recipients
+    
+    Args:
+        recipients: List of dicts with 'email' and optional 'name' keys
+        subject: Email subject line
+        message: Email message body (supports basic markdown-like formatting)
+        sender_name: Name to show as sender
+        
+    Returns:
+        dict: {'success': int, 'failed': int, 'errors': list}
+    """
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print("⚠️  Email sending disabled: SMTP credentials not configured in .env")
+        return {'success': 0, 'failed': len(recipients), 'errors': ['SMTP not configured']}
+    
+    results = {'success': 0, 'failed': 0, 'errors': []}
+    
+    for recipient in recipients:
+        try:
+            to_email = recipient.get('email', '')
+            user_name = recipient.get('name', '')
+            
+            if not to_email:
+                results['failed'] += 1
+                results['errors'].append(f"Missing email for recipient")
+                continue
+            
+            # Create message
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
+            msg["To"] = to_email
+            
+            greeting = f"Hello {user_name}," if user_name else "Hello,"
+            
+            # Convert basic formatting to HTML
+            html_message = message.replace('\n', '<br>')
+            
+            text_content = f"""
+{greeting}
+
+{message}
+
+Best regards,
+{sender_name}
+
+---
+JobPulse - Track Your Career Journey
+https://jobpulse.app
+
+To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in the subject line.
+"""
+            
+            html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }}
+        .email-wrapper {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }}
+        .email-header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+        }}
+        .logo-text {{
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }}
+        .logo-icon {{
+            font-size: 24px;
+            margin-right: 10px;
+        }}
+        .email-body {{
+            padding: 40px 30px;
+        }}
+        .greeting {{
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+        }}
+        .message {{
+            font-size: 16px;
+            color: #555;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }}
+        .footer {{
+            background: #1a1a2e;
+            padding: 30px;
+            text-align: center;
+            color: #aaa;
+            font-size: 14px;
+        }}
+        .footer-link {{
+            color: #667eea;
+            text-decoration: none;
+        }}
+        .unsubscribe {{
+            margin-top: 15px;
+            font-size: 12px;
+            color: #888;
+        }}
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-header">
+            <span class="logo-icon">💼</span>
+            <span class="logo-text">JobPulse</span>
+        </div>
+        
+        <div class="email-body">
+            <div class="greeting">{greeting}</div>
+            <div class="message">{html_message}</div>
+        </div>
+        
+        <div class="footer">
+            <strong>JobPulse</strong> - Smart Job Application Tracker
+            <br>
+            <a href="https://jobpulse.app" class="footer-link">Visit JobPulse</a>
+            <div class="unsubscribe">
+                To unsubscribe from future updates, reply with "UNSUBSCRIBE" in the subject line.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+            
+            part1 = MIMEText(text_content, "plain")
+            part2 = MIMEText(html_content, "html")
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+            
+            results['success'] += 1
+            print(f"✅ Announcement sent to {to_email}")
+            
+        except Exception as e:
+            results['failed'] += 1
+            results['errors'].append(f"{to_email}: {str(e)}")
+            print(f"❌ Failed to send to {to_email}: {e}")
+    
+    return results

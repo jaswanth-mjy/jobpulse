@@ -162,6 +162,46 @@
                     <div class="pagination" id="pagination"></div>
                 </div>
 
+                <!-- Bulk Email Section -->
+                <div class="bulk-email-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-paper-plane"></i> Send Bulk Email</h2>
+                    </div>
+                    <form id="bulkEmailForm" class="bulk-email-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="emailRecipients">Recipients</label>
+                                <select id="emailRecipients" required>
+                                    <option value="all">All Users</option>
+                                    <option value="verified">Verified Users Only</option>
+                                    <option value="unverified">Unverified Users Only</option>
+                                </select>
+                            </div>
+                            <div class="form-group recipient-count">
+                                <span id="recipientCount">-</span> recipients
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="emailSubject">Subject</label>
+                            <input type="text" id="emailSubject" placeholder="e.g., New Feature: Gmail Import Improvements" maxlength="200" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="emailMessage">Message</label>
+                            <textarea id="emailMessage" rows="8" placeholder="Write your announcement message here..." maxlength="10000" required></textarea>
+                            <div class="char-count"><span id="charCount">0</span> / 10000</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-ghost" onclick="previewEmail()">
+                                <i class="fas fa-eye"></i> Preview
+                            </button>
+                            <button type="submit" class="btn btn-primary" id="sendEmailBtn">
+                                <i class="fas fa-paper-plane"></i> Send to <span id="sendCount">All</span> Users
+                            </button>
+                        </div>
+                        <div class="email-result" id="emailResult" style="display: none;"></div>
+                    </form>
+                </div>
+
                 <!-- Footer -->
                 <div class="admin-footer">
                     <p>Last updated: <span id="lastUpdated">-</span></p>
@@ -179,6 +219,30 @@
             </div>
             <div class="modal-body" id="userDetailContent">
                 <!-- Content populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Preview Modal -->
+    <div class="modal-overlay" id="emailPreviewModal" style="display: none;">
+        <div class="modal-content email-preview-modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-envelope-open-text"></i> Email Preview</h2>
+                <button class="modal-close" onclick="closeEmailPreview()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="preview-email-container">
+                    <div class="preview-header">
+                        <strong>Subject:</strong> <span id="previewSubject"></span>
+                    </div>
+                    <div class="preview-body" id="previewBody"></div>
+                </div>
+                <div class="preview-actions">
+                    <button class="btn btn-ghost" onclick="closeEmailPreview()">Close</button>
+                    <button class="btn btn-primary" onclick="confirmSendEmail()">
+                        <i class="fas fa-paper-plane"></i> Send Email
+                    </button>
+                </div>
             </div>
         </div>
     </div>

@@ -26,13 +26,14 @@ FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "f
 
 # Import email sender
 try:
-    from email_sender import send_verification_email, send_welcome_email
+    from email_sender import send_verification_email, send_welcome_email, send_bulk_announcement_email
     EMAIL_ENABLED = True
 except ImportError as e:
     print(f"⚠️  Email sending disabled: {e}")
     EMAIL_ENABLED = False
     def send_verification_email(*args, **kwargs): return False
     def send_welcome_email(*args, **kwargs): return False
+    def send_bulk_announcement_email(*args, **kwargs): return {'success': 0, 'failed': 0, 'errors': ['Email not configured']}
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app, supports_credentials=True)
@@ -2002,6 +2003,58 @@ def admin_users():
             "limit": limit,
             "total_pages": (total_users + limit - 1) // limit
         })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/send-bulk-email", methods=["POST"])
+@require_auth
+@require_admin
+def admin_send_bulk_email():
+    """Send bulk announcement email to users."""
+    try:
+        data = request.get_json()
+        subject = data.get("subject", "").strip()
+        message = data.get("message", "").strip()
+        recipient_filter = data.get("filter", "all")  # all, verified, unverified
+        
+        if not subject or not message:
+            return jsonify({"error": "Subject and message are required"}), 400
+        
+        if len(subject) > 200:
+            return jsonify({"error": "Subject too long (max 200 characters)"}), 400
+        
+        if len(message) > 10000:
+            return jsonify({"error": "Message too long (max 10000 characters)"}), 400
+        
+        db = get_db()
+        
+        # Build query based on filter
+        query = {}
+        if recipient_filter == "verified":
+            query["email_verified"] = True
+        elif recipient_filter == "unverified":
+            query["email_verified"] = {"$ne": True}
+        
+        # Get users
+        users_cursor = db.users.find(query, {"email": 1, "name": 1})
+        recipients = [{"email": u.get("email"), "name": u.get("name", "")} for u in users_cursor if u.get("email")]
+        
+        if not recipients:
+            return jsonify({"error": "No recipients found matching the filter"}), 400
+        
+        # Send emails
+        result = send_bulk_announcement_email(recipients, subject, message)
+        
+        return jsonify({
+            "message": f"Bulk email sent",
+            "total_recipients": len(recipients),
+            "success": result['success'],
+            "failed": result['failed'],
+            "errors": result['errors'][:10]  # Limit errors returned
+        })
+        
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
