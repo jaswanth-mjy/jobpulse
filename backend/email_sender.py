@@ -25,17 +25,48 @@ def _get_admin_gmail_credentials():
     """Get Gmail OAuth credentials from admin user in DB for sending via Gmail API (HTTPS)."""
     try:
         from database import get_db
+        import json
         db = get_db()
         ADMIN_EMAILS = [os.getenv("ADMIN_EMAIL", "shramkavach@gmail.com")]
+        
         for admin_email in ADMIN_EMAILS:
+            # First find the admin user
             admin_user = db.users.find_one({"email": admin_email})
-            if admin_user:
-                gmail_accounts = admin_user.get("gmail_accounts", [])
-                for account in gmail_accounts:
-                    creds = account.get("credentials", {})
-                    if creds and creds.get("refresh_token"):
+            if not admin_user:
+                print(f"⚠️  Admin user {admin_email} not found in DB")
+                continue
+            
+            # Gmail OAuth creds are stored in gmail_config collection (encrypted)
+            gmail_accounts = list(db.gmail_config.find({
+                "user_id": admin_user["_id"],
+                "auth_type": "oauth"
+            }))
+            
+            for account in gmail_accounts:
+                encrypted_creds = account.get("oauth_credentials", "")
+                if not encrypted_creds:
+                    continue
+                
+                try:
+                    # Decrypt the credentials (they are Fernet-encrypted in DB)
+                    # Replicate the same Fernet key derivation as app.py
+                    from cryptography.fernet import Fernet as _Fernet
+                    enc_key = os.environ.get("ENCRYPTION_KEY", "")
+                    if enc_key:
+                        _f = _Fernet(enc_key.encode())
+                    else:
+                        print(f"⚠️  No ENCRYPTION_KEY set - cannot decrypt credentials")
+                        continue
+                    creds_json = _f.decrypt(encrypted_creds.encode("utf-8")).decode("utf-8")
+                    creds = json.loads(creds_json)
+                    if creds.get("refresh_token"):
                         print(f"✅ Found Gmail OAuth credentials from admin {account.get('email', admin_email)}")
                         return creds
+                except Exception as decrypt_err:
+                    print(f"⚠️  Failed to decrypt OAuth credentials: {decrypt_err}")
+                    continue
+            
+            print(f"⚠️  No OAuth Gmail accounts found for admin {admin_email}")
     except Exception as e:
         print(f"⚠️  Could not fetch admin Gmail credentials: {e}")
     return None

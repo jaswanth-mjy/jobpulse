@@ -2104,15 +2104,19 @@ def admin_send_bulk_email():
         
         # Try to get admin's Gmail OAuth credentials for sending via Gmail API (works on Render)
         gmail_credentials = None
-        admin_user = db.users.find_one({"_id": ObjectId(g.user_id)})
-        if admin_user:
-            # Check for connected Gmail accounts with OAuth
-            gmail_accounts = admin_user.get("gmail_accounts", [])
-            for account in gmail_accounts:
-                if account.get("credentials") and account.get("credentials", {}).get("refresh_token"):
-                    gmail_credentials = account["credentials"]
-                    print(f"✅ Found Gmail OAuth credentials for {account.get('email', 'admin')}")
-                    break
+        admin_user_id = ObjectId(g.user_id)
+        # Gmail OAuth creds are in gmail_config collection, encrypted
+        oauth_account = db.gmail_config.find_one({
+            "user_id": admin_user_id,
+            "auth_type": "oauth"
+        })
+        if oauth_account and oauth_account.get("oauth_credentials"):
+            try:
+                creds_json = decrypt_value(oauth_account["oauth_credentials"])
+                gmail_credentials = json.loads(creds_json)
+                print(f"✅ Found Gmail OAuth credentials for admin {oauth_account.get('email', 'unknown')}")
+            except Exception as cred_err:
+                print(f"⚠️  Failed to decrypt admin OAuth credentials: {cred_err}")
         
         # Send emails (will use Gmail API if credentials available, otherwise SMTP)
         result = send_bulk_announcement_email(recipients, subject, message, gmail_credentials=gmail_credentials)
