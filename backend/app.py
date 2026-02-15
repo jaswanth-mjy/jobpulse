@@ -2017,7 +2017,8 @@ def admin_send_bulk_email():
         data = request.get_json()
         subject = data.get("subject", "").strip()
         message = data.get("message", "").strip()
-        recipient_filter = data.get("filter", "all")  # all, verified, unverified
+        recipient_filter = data.get("filter", "all")  # all, verified, unverified, selected
+        selected_user_ids = data.get("selected_user_ids", [])  # List of user IDs when filter is "selected"
         
         if not subject or not message:
             return jsonify({"error": "Subject and message are required"}), 400
@@ -2036,6 +2037,20 @@ def admin_send_bulk_email():
             query["email_verified"] = True
         elif recipient_filter == "unverified":
             query["email_verified"] = {"$ne": True}
+        elif recipient_filter == "selected":
+            if not selected_user_ids:
+                return jsonify({"error": "No users selected"}), 400
+            # Convert string IDs to ObjectIds
+            from bson import ObjectId
+            object_ids = []
+            for uid in selected_user_ids:
+                try:
+                    object_ids.append(ObjectId(uid))
+                except:
+                    pass  # Skip invalid IDs
+            if not object_ids:
+                return jsonify({"error": "No valid user IDs provided"}), 400
+            query["_id"] = {"$in": object_ids}
         
         # Get users
         users_cursor = db.users.find(query, {"email": 1, "name": 1})

@@ -689,7 +689,7 @@ The JobPulse Team
 
 def send_bulk_announcement_email(recipients: list, subject: str, message: str, sender_name: str = "JobPulse Team") -> dict:
     """
-    Send a bulk announcement email to multiple recipients
+    Send a bulk announcement email to multiple recipients with modern styling
     
     Args:
         recipients: List of dicts with 'email' and optional 'name' keys
@@ -722,10 +722,38 @@ def send_bulk_announcement_email(recipients: list, subject: str, message: str, s
             msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
             msg["To"] = to_email
             
-            greeting = f"Hello {user_name}," if user_name else "Hello,"
+            greeting = f"Hi {user_name}," if user_name else "Hi there,"
             
-            # Convert basic formatting to HTML
-            html_message = message.replace('\n', '<br>')
+            # Convert markdown-like formatting to HTML
+            html_message = message
+            # Bold: **text** -> <strong>text</strong>
+            import re
+            html_message = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html_message)
+            # Italic: *text* -> <em>text</em>
+            html_message = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html_message)
+            # Links: [text](url) -> <a href="url">text</a>
+            html_message = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2" style="color: #6366f1; text-decoration: none; font-weight: 500;">\1</a>', html_message)
+            # Bullet points: - item -> styled list
+            lines = html_message.split('\n')
+            formatted_lines = []
+            in_list = False
+            for line in lines:
+                if line.strip().startswith('- '):
+                    if not in_list:
+                        formatted_lines.append('<ul style="margin: 15px 0; padding-left: 20px;">')
+                        in_list = True
+                    formatted_lines.append(f'<li style="margin: 8px 0; color: #374151;">{line.strip()[2:]}</li>')
+                else:
+                    if in_list:
+                        formatted_lines.append('</ul>')
+                        in_list = False
+                    if line.strip():
+                        formatted_lines.append(f'<p style="margin: 0 0 15px 0; color: #374151; line-height: 1.7;">{line}</p>')
+                    else:
+                        formatted_lines.append('<br>')
+            if in_list:
+                formatted_lines.append('</ul>')
+            html_message = '\n'.join(formatted_lines)
             
             text_content = f"""
 {greeting}
@@ -744,92 +772,145 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
             
             html_content = f"""
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {{
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f4f4f4;
-        }}
-        .email-wrapper {{
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-        }}
-        .email-header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px;
-            text-align: center;
-        }}
-        .logo-text {{
-            color: #ffffff;
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }}
-        .logo-icon {{
-            font-size: 24px;
-            margin-right: 10px;
-        }}
-        .email-body {{
-            padding: 40px 30px;
-        }}
-        .greeting {{
-            font-size: 18px;
-            color: #333;
-            margin-bottom: 20px;
-        }}
-        .message {{
-            font-size: 16px;
-            color: #555;
-            line-height: 1.8;
-            margin-bottom: 30px;
-        }}
-        .footer {{
-            background: #1a1a2e;
-            padding: 30px;
-            text-align: center;
-            color: #aaa;
-            font-size: 14px;
-        }}
-        .footer-link {{
-            color: #667eea;
-            text-decoration: none;
-        }}
-        .unsubscribe {{
-            margin-top: 15px;
-            font-size: 12px;
-            color: #888;
-        }}
-    </style>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>{subject}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
 </head>
-<body>
-    <div class="email-wrapper">
-        <div class="email-header">
-            <span class="logo-icon">💼</span>
-            <span class="logo-text">JobPulse</span>
-        </div>
-        
-        <div class="email-body">
-            <div class="greeting">{greeting}</div>
-            <div class="message">{html_message}</div>
-        </div>
-        
-        <div class="footer">
-            <strong>JobPulse</strong> - Smart Job Application Tracker
-            <br>
-            <a href="https://jobpulse.app" class="footer-link">Visit JobPulse</a>
-            <div class="unsubscribe">
-                To unsubscribe from future updates, reply with "UNSUBSCRIBE" in the subject line.
-            </div>
-        </div>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; -webkit-font-smoothing: antialiased;">
+    
+    <!-- Preheader text (hidden but shows in email preview) -->
+    <div style="display: none; max-height: 0; overflow: hidden;">
+        {message[:100]}...
     </div>
+    
+    <!-- Main wrapper -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f3f4f6;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                
+                <!-- Email container -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+                    
+                    <!-- Header with gradient -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%); padding: 40px 30px; text-align: center;">
+                            <!-- Logo -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                                <tr>
+                                    <td style="background-color: rgba(255,255,255,0.2); border-radius: 12px; padding: 12px 20px;">
+                                        <span style="font-size: 28px; color: #ffffff; font-weight: 800; letter-spacing: -0.5px;">
+                                            💼 JobPulse
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <!-- Tagline -->
+                            <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 15px 0 0 0; font-weight: 500;">
+                                Smart Job Application Tracker
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Announcement badge -->
+                    <tr>
+                        <td style="padding: 30px 30px 0 30px; text-align: center;">
+                            <span style="display: inline-block; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; font-size: 12px; font-weight: 700; padding: 6px 16px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                📢 Announcement
+                            </span>
+                        </td>
+                    </tr>
+                    
+                    <!-- Body content -->
+                    <tr>
+                        <td style="padding: 30px 40px 40px 40px;">
+                            <!-- Greeting -->
+                            <h2 style="margin: 0 0 25px 0; color: #111827; font-size: 24px; font-weight: 700; line-height: 1.3;">
+                                {greeting}
+                            </h2>
+                            
+                            <!-- Message content -->
+                            <div style="font-size: 16px; line-height: 1.7; color: #374151;">
+                                {html_message}
+                            </div>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 35px 0;">
+                                <tr>
+                                    <td style="border-radius: 10px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                                        <a href="https://jobpulse.app" target="_blank" style="display: inline-block; padding: 16px 32px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px;">
+                                            Open JobPulse →
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Signature -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-top: 1px solid #e5e7eb; padding-top: 25px; margin-top: 30px; width: 100%;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0; color: #6b7280; font-size: 15px;">
+                                            Best regards,<br>
+                                            <strong style="color: #374151;">{sender_name}</strong>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #1f2937; padding: 30px 40px; text-align: center;">
+                            <!-- Social links placeholder -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto 20px auto;">
+                                <tr>
+                                    <td style="padding: 0 8px;">
+                                        <span style="color: #9ca3af; font-size: 20px;">🌐</span>
+                                    </td>
+                                    <td style="padding: 0 8px;">
+                                        <span style="color: #9ca3af; font-size: 20px;">📧</span>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 0 0 15px 0; color: #9ca3af; font-size: 14px;">
+                                <strong style="color: #ffffff;">JobPulse</strong> — Track every application, land more interviews
+                            </p>
+                            
+                            <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
+                                You're receiving this because you're a JobPulse user.<br>
+                                <a href="mailto:shramkavach@gmail.com?subject=UNSUBSCRIBE" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> from future updates
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+                
+                <!-- Footer note -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 20px auto 0 auto;">
+                    <tr>
+                        <td style="text-align: center; color: #9ca3af; font-size: 11px;">
+                            © 2026 JobPulse. Made with ❤️ for job seekers everywhere.
+                        </td>
+                    </tr>
+                </table>
+                
+            </td>
+        </tr>
+    </table>
+    
 </body>
 </html>
 """

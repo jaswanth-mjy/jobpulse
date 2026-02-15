@@ -19,6 +19,9 @@ let usersData = [];
 // Store stats data for recipient count
 let statsData = null;
 
+// Selected users for bulk email
+let selectedUsers = new Map(); // userId -> {email, name}
+
 // DOM helpers
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -152,7 +155,7 @@ async function loadUsers(page = 1) {
     const tbody = $("#usersTableBody");
     tbody.innerHTML = `
         <tr>
-            <td colspan="8" class="loading-row">
+            <td colspan="9" class="loading-row">
                 <div class="spinner small"></div>
                 Loading users...
             </td>
@@ -175,14 +178,23 @@ async function loadUsers(page = 1) {
         if (data.users.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="loading-row">
+                    <td colspan="9" class="loading-row">
                         No users found
                     </td>
                 </tr>
             `;
         } else {
             tbody.innerHTML = data.users.map((user, index) => `
-                <tr>
+                <tr class="${selectedUsers.has(user.id) ? 'selected-row' : ''}">
+                    <td class="checkbox-col">
+                        <input type="checkbox" 
+                            class="user-checkbox" 
+                            data-user-id="${user.id}"
+                            data-user-email="${escapeHtml(user.email)}"
+                            data-user-name="${escapeHtml(user.name || '')}"
+                            ${selectedUsers.has(user.id) ? 'checked' : ''}
+                            onchange="toggleUserSelection(this)">
+                    </td>
                     <td>${(page - 1) * pageLimit + index + 1}</td>
                     <td>
                         <div class="user-cell">
@@ -230,7 +242,7 @@ async function loadUsers(page = 1) {
         console.error("Error loading users:", error);
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="loading-row">
+                <td colspan="9" class="loading-row">
                     Error loading users. Please try again.
                 </td>
             </tr>
@@ -428,11 +440,80 @@ function formatDateTime(dateStr) {
 
 // ========== BULK EMAIL ==========
 
+// Selected users tracking
+function toggleUserSelection(checkbox) {
+    const userId = checkbox.dataset.userId;
+    const userEmail = checkbox.dataset.userEmail;
+    const userName = checkbox.dataset.userName;
+    
+    if (checkbox.checked) {
+        selectedUsers.set(userId, { email: userEmail, name: userName });
+        checkbox.closest('tr').classList.add('selected-row');
+    } else {
+        selectedUsers.delete(userId);
+        checkbox.closest('tr').classList.remove('selected-row');
+    }
+    
+    updateSelectionUI();
+}
+
+function toggleSelectAll(checked) {
+    const checkboxes = $$('.user-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = checked;
+        toggleUserSelection(checkbox);
+    });
+}
+
+function clearSelection() {
+    selectedUsers.clear();
+    $$('.user-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.closest('tr').classList.remove('selected-row');
+    });
+    $('#selectAllUsers').checked = false;
+    updateSelectionUI();
+}
+
+function updateSelectionUI() {
+    const count = selectedUsers.size;
+    const selectionInfo = $('#selectionInfo');
+    const selectedOption = $('#selectedOption');
+    const selectedUsersHint = $('#selectedUsersHint');
+    
+    if (count > 0) {
+        selectionInfo.style.display = 'flex';
+        $('#selectedCount').textContent = count;
+        selectedOption.disabled = false;
+        selectedOption.textContent = `Selected Users (${count})`;
+    } else {
+        selectionInfo.style.display = 'none';
+        selectedOption.disabled = true;
+        selectedOption.textContent = 'Selected Users (0)';
+        // If was on "selected", switch back to "all"
+        if ($('#emailRecipients').value === 'selected') {
+            $('#emailRecipients').value = 'all';
+        }
+    }
+    
+    // Show/hide hint based on dropdown value
+    if ($('#emailRecipients').value === 'selected') {
+        selectedUsersHint.style.display = count > 0 ? 'none' : 'block';
+    } else {
+        selectedUsersHint.style.display = 'none';
+    }
+    
+    updateRecipientCount();
+}
+
 // Update recipient count when filter changes
 document.addEventListener("DOMContentLoaded", () => {
     const recipientSelect = $("#emailRecipients");
     if (recipientSelect) {
-        recipientSelect.addEventListener("change", updateRecipientCount);
+        recipientSelect.addEventListener("change", () => {
+            updateRecipientCount();
+            updateSelectionUI();
+        });
     }
     
     const messageTextarea = $("#emailMessage");
@@ -464,10 +545,13 @@ function updateRecipientCount() {
         case "unverified":
             count = statsData.unverified_users;
             break;
+        case "selected":
+            count = selectedUsers.size;
+            break;
     }
     
     $("#recipientCount").textContent = count;
-    $("#sendCount").textContent = count;
+    $("#sendCount").textContent = filter === "selected" ? `${count} Selected` : count;
 }
 
 async function handleBulkEmailSubmit(e) {
@@ -504,11 +588,26 @@ async function confirmSendEmail() {
     const message = $("#emailMessage").value.trim();
     const filter = $("#emailRecipients").value;
     
+    // Build request body
+    const requestBody = { subject, message, filter };
+    
+    // If sending to selected users, include the user IDs
+    if (filter === "selected") {
+        if (selectedUsers.size === 0) {
+            showEmailResult("❌ No users selected. Please select users from the table above.", "error");
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            closeEmailPreview();
+            return;
+        }
+        requestBody.selected_user_ids = Array.from(selectedUsers.keys());
+    }
+    
     try {
         const res = await fetch(`${API}/admin/send-bulk-email`, {
             method: "POST",
             headers: getAuthHeaders(),
-            body: JSON.stringify({ subject, message, filter })
+            body: JSON.stringify(requestBody)
         });
         
         const data = await res.json();
