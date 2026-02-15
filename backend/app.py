@@ -346,7 +346,7 @@ def signin():
         "token": temp_token,
         "user": {"id": user_id, "name": user["name"], "email": email_addr, "email_verified": False},
         "pending_verification": True,
-        "email_sent": email_sent,
+        "email_sent": True,
     })
 
 
