@@ -1298,7 +1298,10 @@ def gmail_scan():
             return jsonify({"error": "No Gmail accounts connected. Please connect first."}), 401
 
         data = request.get_json() or {}
-        days_back = data.get("days_back", 365)
+        days_back = data.get("days_back", 90)
+        # Enforce maximum of 90 days (3 months)
+        if days_back > 90:
+            days_back = 90
         max_results = data.get("max_results", 2000)
 
         all_applications = []
