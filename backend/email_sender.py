@@ -920,14 +920,43 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
             msg.attach(part1)
             msg.attach(part2)
             
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            # Add timeout to prevent infinite hanging (30 seconds)
+            # Try TLS on port 587 first, fall back to SSL on 465
+            try:
+                server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
                 server.starttls()
+            except (OSError, smtplib.SMTPConnectError) as conn_err:
+                # Try SSL on port 465 as fallback
+                print(f"⚠️  Port {SMTP_PORT} failed, trying SSL port 465...")
+                try:
+                    server = smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=30)
+                except Exception as ssl_err:
+                    raise ConnectionError(f"Cannot connect to SMTP server. Both port {SMTP_PORT} and 465 failed. Your network may be blocking SMTP traffic.")
+            
+            try:
                 server.login(SMTP_USER, SMTP_PASSWORD)
                 server.send_message(msg)
+                results['success'] += 1
+                print(f"✅ Announcement sent to {to_email}")
+            finally:
+                server.quit()
             
-            results['success'] += 1
-            print(f"✅ Announcement sent to {to_email}")
-            
+        except ConnectionError as e:
+            results['failed'] += 1
+            results['errors'].append(f"Network Error: {str(e)}")
+            print(f"❌ Network error: {e}")
+            # If we can't connect at all, no point trying other recipients
+            if results['success'] == 0 and results['failed'] == 1:
+                results['errors'].append("Tip: Try using a mobile hotspot or deploy to Render where SMTP is not blocked.")
+            break
+        except smtplib.SMTPAuthenticationError as e:
+            results['failed'] += 1
+            results['errors'].append(f"Authentication error: Check SMTP credentials")
+            print(f"❌ SMTP authentication failed: {e}")
+        except TimeoutError as e:
+            results['failed'] += 1
+            results['errors'].append(f"Timeout: SMTP server not responding")
+            print(f"❌ SMTP timeout: {e}")
         except Exception as e:
             results['failed'] += 1
             results['errors'].append(f"{to_email}: {str(e)}")
