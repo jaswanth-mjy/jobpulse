@@ -960,7 +960,7 @@
                         </div>
                         <div class="gmail-card-body">
                             <p class="gmail-description" style="margin-bottom: 20px;">
-                                <strong>Note:</strong> Sign in with Google (OAuth) is temporarily disabled. Please use App Password to connect your Gmail account.
+                                Choose how you want to connect your Gmail account.
                             </p>
                             
                             <div class="auth-method-options">
@@ -990,18 +990,18 @@
                                     </div>
                                 </div>
                                 
-                                <!-- OAuth Option (DISABLED FOR NOW) -->
-                                <div class="auth-method-card" id="oauthMethodCard" style="opacity: 0.6; pointer-events: none;">
+                                <!-- OAuth Option (Admin Only) -->
+                                <div class="auth-method-card" id="oauthMethodCard" style="display: none;">
                                     <div class="auth-method-icon">
                                         <i class="fab fa-google"></i>
                                     </div>
                                     <h3>Sign in with Google</h3>
                                     <p class="auth-method-desc">
                                         Quick setup with OAuth 2.0 — no passwords needed.<br>
-                                        <span class="note-text">⚠️ Temporarily disabled - Use App Password instead</span>
+                                        <span class="note-text" style="color: #4285f4;">🔒 Admin Only</span>
                                     </p>
-                                    <button class="btn btn-secondary" id="startOAuthBtn" disabled style="cursor: not-allowed; opacity: 0.5;">
-                                        <i class="fab fa-google"></i> Currently Unavailable
+                                    <button class="btn btn-secondary" id="startOAuthBtn">
+                                        <i class="fab fa-google"></i> Connect with Google
                                     </button>
                                 </div>
                             </div>

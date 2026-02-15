@@ -689,7 +689,7 @@ The JobPulse Team
 
 def send_bulk_announcement_email(recipients: list, subject: str, message: str, sender_name: str = "JobPulse Team", gmail_credentials: dict = None) -> dict:
     """
-    Send a bulk announcement email to multiple recipients with modern styling
+    Send a bulk announcement email to multiple recipients using BCC (single email send).
     
     Args:
         recipients: List of dicts with 'email' and optional 'name' keys
@@ -709,67 +709,67 @@ def send_bulk_announcement_email(recipients: list, subject: str, message: str, s
         return {'success': 0, 'failed': len(recipients), 'errors': ['No email sending method configured. Connect Gmail in admin or add SMTP credentials.']}
     
     # Import Gmail OAuth functions if using Gmail API
+    sender_email = FROM_EMAIL  # Default sender
     if use_gmail_api:
         try:
-            from gmail_oauth import credentials_from_dict, refresh_credentials_if_needed, send_email_via_gmail_api
+            from gmail_oauth import credentials_from_dict, refresh_credentials_if_needed, send_email_via_gmail_api, get_user_email
             credentials, updated_creds = refresh_credentials_if_needed(gmail_credentials)
-            print(f"✅ Using Gmail API for sending (HTTPS-based)")
+            sender_email = get_user_email(credentials)  # Get the authenticated user's email
+            print(f"✅ Using Gmail API for sending (HTTPS-based) from {sender_email}")
         except Exception as e:
             print(f"❌ Failed to initialize Gmail API: {e}")
             return {'success': 0, 'failed': len(recipients), 'errors': [f'Gmail API init failed: {str(e)}']}
     
     results = {'success': 0, 'failed': 0, 'errors': []}
     
+    # Extract valid email addresses for BCC
+    bcc_emails = []
     for recipient in recipients:
-        try:
-            to_email = recipient.get('email', '')
-            user_name = recipient.get('name', '')
-            
-            if not to_email:
-                results['failed'] += 1
-                results['errors'].append(f"Missing email for recipient")
-                continue
-            
-            # Create message
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
-            msg["To"] = to_email
-            
-            greeting = f"Hi {user_name}," if user_name else "Hi there,"
-            
-            # Convert markdown-like formatting to HTML
-            html_message = message
-            # Bold: **text** -> <strong>text</strong>
-            import re
-            html_message = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html_message)
-            # Italic: *text* -> <em>text</em>
-            html_message = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html_message)
-            # Links: [text](url) -> <a href="url">text</a>
-            html_message = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2" style="color: #6366f1; text-decoration: none; font-weight: 500;">\1</a>', html_message)
-            # Bullet points: - item -> styled list
-            lines = html_message.split('\n')
-            formatted_lines = []
-            in_list = False
-            for line in lines:
-                if line.strip().startswith('- '):
-                    if not in_list:
-                        formatted_lines.append('<ul style="margin: 15px 0; padding-left: 20px;">')
-                        in_list = True
-                    formatted_lines.append(f'<li style="margin: 8px 0; color: #374151;">{line.strip()[2:]}</li>')
-                else:
-                    if in_list:
-                        formatted_lines.append('</ul>')
-                        in_list = False
-                    if line.strip():
-                        formatted_lines.append(f'<p style="margin: 0 0 15px 0; color: #374151; line-height: 1.7;">{line}</p>')
-                    else:
-                        formatted_lines.append('<br>')
+        email = recipient.get('email', '').strip()
+        if email:
+            bcc_emails.append(email)
+        else:
+            results['failed'] += 1
+            results['errors'].append(f"Missing email for recipient")
+    
+    if not bcc_emails:
+        return {'success': 0, 'failed': results['failed'], 'errors': results['errors'] + ['No valid email addresses provided']}
+    
+    # Use generic greeting since BCC goes to all recipients
+    greeting = "Hi there,"
+    
+    # Convert markdown-like formatting to HTML
+    import re
+    html_message = message
+    # Bold: **text** -> <strong>text</strong>
+    html_message = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html_message)
+    # Italic: *text* -> <em>text</em>
+    html_message = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html_message)
+    # Links: [text](url) -> <a href="url">text</a>
+    html_message = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2" style="color: #6366f1; text-decoration: none; font-weight: 500;">\1</a>', html_message)
+    # Bullet points: - item -> styled list
+    lines = html_message.split('\n')
+    formatted_lines = []
+    in_list = False
+    for line in lines:
+        if line.strip().startswith('- '):
+            if not in_list:
+                formatted_lines.append('<ul style="margin: 15px 0; padding-left: 20px;">')
+                in_list = True
+            formatted_lines.append(f'<li style="margin: 8px 0; color: #374151;">{line.strip()[2:]}</li>')
+        else:
             if in_list:
                 formatted_lines.append('</ul>')
-            html_message = '\n'.join(formatted_lines)
-            
-            text_content = f"""
+                in_list = False
+            if line.strip():
+                formatted_lines.append(f'<p style="margin: 0 0 15px 0; color: #374151; line-height: 1.7;">{line}</p>')
+            else:
+                formatted_lines.append('<br>')
+    if in_list:
+        formatted_lines.append('</ul>')
+    html_message = '\n'.join(formatted_lines)
+    
+    text_content = f"""
 {greeting}
 
 {message}
@@ -779,12 +779,12 @@ Best regards,
 
 ---
 JobPulse - Track Your Career Journey
-https://jobpulse.app
+https://jobpulse.shramkavach.com
 
 To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in the subject line.
 """
-            
-            html_content = f"""
+    
+    html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -802,123 +802,125 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
     </noscript>
     <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; -webkit-font-smoothing: antialiased;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;">
     
     <!-- Preheader text (hidden but shows in email preview) -->
-    <div style="display: none; max-height: 0; overflow: hidden;">
-        {message[:100]}...
+    <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
+        {message[:120]}
     </div>
     
     <!-- Main wrapper -->
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f3f4f6;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc;">
         <tr>
-            <td style="padding: 40px 20px;">
+            <td style="padding: 48px 24px;">
                 
                 <!-- Email container -->
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; max-width: 600px;">
                     
-                    <!-- Header with gradient -->
+                    <!-- Logo Header -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%); padding: 40px 30px; text-align: center;">
-                            <!-- Logo -->
+                        <td style="padding: 0 0 32px 0; text-align: center;">
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                                 <tr>
-                                    <td style="background-color: rgba(255,255,255,0.2); border-radius: 12px; padding: 12px 20px;">
-                                        <span style="font-size: 28px; color: #ffffff; font-weight: 800; letter-spacing: -0.5px;">
-                                            💼 JobPulse
-                                        </span>
+                                    <td style="vertical-align: middle; padding-right: 12px;">
+                                        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 12px; display: inline-block; text-align: center; line-height: 44px;">
+                                            <span style="font-size: 22px;">💼</span>
+                                        </div>
+                                    </td>
+                                    <td style="vertical-align: middle;">
+                                        <span style="font-size: 26px; color: #0f172a; font-weight: 700; letter-spacing: -0.5px;">JobPulse</span>
                                     </td>
                                 </tr>
                             </table>
-                            <!-- Tagline -->
-                            <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 15px 0 0 0; font-weight: 500;">
-                                Smart Job Application Tracker
-                            </p>
                         </td>
                     </tr>
                     
-                    <!-- Announcement badge -->
+                    <!-- Main Content Card -->
                     <tr>
-                        <td style="padding: 30px 30px 0 30px; text-align: center;">
-                            <span style="display: inline-block; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; font-size: 12px; font-weight: 700; padding: 6px 16px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
-                                📢 Announcement
-                            </span>
-                        </td>
-                    </tr>
-                    
-                    <!-- Body content -->
-                    <tr>
-                        <td style="padding: 30px 40px 40px 40px;">
-                            <!-- Greeting -->
-                            <h2 style="margin: 0 0 25px 0; color: #111827; font-size: 24px; font-weight: 700; line-height: 1.3;">
-                                {greeting}
-                            </h2>
-                            
-                            <!-- Message content -->
-                            <div style="font-size: 16px; line-height: 1.7; color: #374151;">
-                                {html_message}
-                            </div>
-                            
-                            <!-- CTA Button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 35px 0;">
+                        <td>
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);">
+                                
+                                <!-- Top accent bar -->
                                 <tr>
-                                    <td style="border-radius: 10px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
-                                        <a href="https://jobpulse.app" target="_blank" style="display: inline-block; padding: 16px 32px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px;">
-                                            Open JobPulse →
-                                        </a>
-                                    </td>
+                                    <td style="height: 4px; background: linear-gradient(90deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%); border-radius: 16px 16px 0 0;"></td>
                                 </tr>
-                            </table>
-                            
-                            <!-- Signature -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-top: 1px solid #e5e7eb; padding-top: 25px; margin-top: 30px; width: 100%;">
+                                
+                                <!-- Content -->
                                 <tr>
-                                    <td>
-                                        <p style="margin: 0; color: #6b7280; font-size: 15px;">
-                                            Best regards,<br>
-                                            <strong style="color: #374151;">{sender_name}</strong>
+                                    <td style="padding: 48px 48px 40px 48px;">
+                                        
+                                        <!-- Subject as title -->
+                                        <h1 style="margin: 0 0 24px 0; color: #0f172a; font-size: 28px; font-weight: 700; line-height: 1.3; letter-spacing: -0.5px;">
+                                            {subject}
+                                        </h1>
+                                        
+                                        <!-- Greeting -->
+                                        <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+                                            {greeting}
                                         </p>
+                                        
+                                        <!-- Message content -->
+                                        <div style="font-size: 16px; line-height: 1.75; color: #334155;">
+                                            {html_message}
+                                        </div>
+                                        
+                                        <!-- CTA Button -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 36px 0 0 0;">
+                                            <tr>
+                                                <td style="border-radius: 8px; background-color: #3b82f6;">
+                                                    <a href="https://jobpulse.shramkavach.com" target="_blank" style="display: inline-block; padding: 14px 28px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; letter-spacing: 0.2px;">
+                                                        Open JobPulse
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
                                     </td>
                                 </tr>
+                                
+                                <!-- Signature -->
+                                <tr>
+                                    <td style="padding: 0 48px 48px 48px;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-top: 1px solid #e2e8f0; padding-top: 24px; width: 100%;">
+                                            <tr>
+                                                <td>
+                                                    <p style="margin: 0 0 4px 0; color: #64748b; font-size: 14px;">
+                                                        Best regards,
+                                                    </p>
+                                                    <p style="margin: 0; color: #0f172a; font-size: 15px; font-weight: 600;">
+                                                        {sender_name}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                
                             </table>
                         </td>
                     </tr>
                     
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #1f2937; padding: 30px 40px; text-align: center;">
-                            <!-- Social links placeholder -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto 20px auto;">
-                                <tr>
-                                    <td style="padding: 0 8px;">
-                                        <span style="color: #9ca3af; font-size: 20px;">🌐</span>
-                                    </td>
-                                    <td style="padding: 0 8px;">
-                                        <span style="color: #9ca3af; font-size: 20px;">📧</span>
-                                    </td>
-                                </tr>
-                            </table>
+                        <td style="padding: 32px 24px; text-align: center;">
                             
-                            <p style="margin: 0 0 15px 0; color: #9ca3af; font-size: 14px;">
-                                <strong style="color: #ffffff;">JobPulse</strong> — Track every application, land more interviews
+                            <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px; line-height: 1.5;">
+                                You're receiving this email because you're registered on JobPulse.
                             </p>
                             
-                            <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.6;">
-                                You're receiving this because you're a JobPulse user.<br>
-                                <a href="mailto:shramkavach@gmail.com?subject=UNSUBSCRIBE" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> from future updates
+                            <p style="margin: 0 0 16px 0; color: #94a3b8; font-size: 12px;">
+                                <a href="mailto:shramkavach@gmail.com?subject=UNSUBSCRIBE" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+                                &nbsp;·&nbsp;
+                                <a href="https://jobpulse.shramkavach.com/privacy-policy.html" style="color: #64748b; text-decoration: underline;">Privacy Policy</a>
                             </p>
+                            
+                            <p style="margin: 0; color: #94a3b8; font-size: 12px;">
+                                © 2026 JobPulse. All rights reserved.
+                            </p>
+                            
                         </td>
                     </tr>
                     
-                </table>
-                
-                <!-- Footer note -->
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 20px auto 0 auto;">
-                    <tr>
-                        <td style="text-align: center; color: #9ca3af; font-size: 11px;">
-                            © 2026 JobPulse. Made with ❤️ for job seekers everywhere.
-                        </td>
-                    </tr>
                 </table>
                 
             </td>
@@ -928,75 +930,78 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
 </body>
 </html>
 """
-            
-            # Try Gmail API first (HTTPS-based, works on Render)
-            if use_gmail_api:
-                try:
-                    if send_email_via_gmail_api(credentials, to_email, subject, html_content, text_content):
-                        results['success'] += 1
-                        continue
-                    else:
-                        # Gmail API failed, will try SMTP as fallback
-                        print(f"⚠️  Gmail API failed for {to_email}, trying SMTP...")
-                except Exception as gmail_err:
-                    print(f"⚠️  Gmail API error for {to_email}: {gmail_err}, trying SMTP...")
-            
-            # Fall back to SMTP
-            if not SMTP_USER or not SMTP_PASSWORD:
-                results['failed'] += 1
-                results['errors'].append(f"{to_email}: No SMTP fallback available")
-                continue
-                
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
-            msg["To"] = to_email
-            
-            part1 = MIMEText(text_content, "plain")
-            part2 = MIMEText(html_content, "html")
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            # Add timeout to prevent infinite hanging (30 seconds)
-            # Try TLS on port 587 first, fall back to SSL on 465
+    
+    # Send single email with BCC to all recipients
+    try:
+        # Try Gmail API first (HTTPS-based, works on Render)
+        if use_gmail_api:
             try:
-                server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
-                server.starttls()
-            except (OSError, smtplib.SMTPConnectError) as conn_err:
-                # Try SSL on port 465 as fallback
-                print(f"⚠️  Port {SMTP_PORT} failed, trying SSL port 465...")
-                try:
-                    server = smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=30)
-                except Exception as ssl_err:
-                    raise ConnectionError(f"Cannot connect to SMTP server. Both port {SMTP_PORT} and 465 failed. Connect Gmail in admin dashboard to use Gmail API instead.")
-            
+                # Send to self with all recipients in BCC
+                if send_email_via_gmail_api(credentials, sender_email, subject, html_content, text_content, bcc_list=bcc_emails):
+                    results['success'] = len(bcc_emails)
+                    print(f"✅ Bulk announcement sent to {len(bcc_emails)} recipients via Gmail API (BCC)")
+                    return results
+                else:
+                    # Gmail API failed, will try SMTP as fallback
+                    print(f"⚠️  Gmail API failed, trying SMTP...")
+            except Exception as gmail_err:
+                print(f"⚠️  Gmail API error: {gmail_err}, trying SMTP...")
+        
+        # Fall back to SMTP with BCC
+        if not SMTP_USER or not SMTP_PASSWORD:
+            results['failed'] = len(bcc_emails)
+            results['errors'].append("No SMTP fallback available")
+            return results
+        
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
+        msg["To"] = FROM_EMAIL  # Send to self
+        msg["Bcc"] = ", ".join(bcc_emails)  # All recipients in BCC
+        
+        part1 = MIMEText(text_content, "plain")
+        part2 = MIMEText(html_content, "html")
+        msg.attach(part1)
+        msg.attach(part2)
+        
+        # Add timeout to prevent infinite hanging (30 seconds)
+        # Try TLS on port 587 first, fall back to SSL on 465
+        try:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
+            server.starttls()
+        except (OSError, smtplib.SMTPConnectError) as conn_err:
+            # Try SSL on port 465 as fallback
+            print(f"⚠️  Port {SMTP_PORT} failed, trying SSL port 465...")
             try:
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.send_message(msg)
-                results['success'] += 1
-                print(f"✅ Announcement sent to {to_email}")
-            finally:
-                server.quit()
-            
-        except ConnectionError as e:
-            results['failed'] += 1
-            results['errors'].append(f"Network Error: {str(e)}")
-            print(f"❌ Network error: {e}")
-            # If we can't connect at all, no point trying other recipients via SMTP
-            if results['success'] == 0 and results['failed'] == 1:
-                results['errors'].append("Tip: Connect your Gmail account with 'Send' permission in admin dashboard.")
-            break
-        except smtplib.SMTPAuthenticationError as e:
-            results['failed'] += 1
-            results['errors'].append(f"Authentication error: Check SMTP credentials")
-            print(f"❌ SMTP authentication failed: {e}")
-        except TimeoutError as e:
-            results['failed'] += 1
-            results['errors'].append(f"Timeout: SMTP server not responding")
-            print(f"❌ SMTP timeout: {e}")
-        except Exception as e:
-            results['failed'] += 1
-            results['errors'].append(f"{to_email}: {str(e)}")
-            print(f"❌ Failed to send to {to_email}: {e}")
+                server = smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=30)
+            except Exception as ssl_err:
+                raise ConnectionError(f"Cannot connect to SMTP server. Both port {SMTP_PORT} and 465 failed. Connect Gmail in admin dashboard to use Gmail API instead.")
+        
+        try:
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            # SMTP send_message handles BCC properly
+            server.send_message(msg)
+            results['success'] = len(bcc_emails)
+            print(f"✅ Bulk announcement sent to {len(bcc_emails)} recipients via SMTP (BCC)")
+        finally:
+            server.quit()
+        
+    except ConnectionError as e:
+        results['failed'] = len(bcc_emails)
+        results['errors'].append(f"Network Error: {str(e)}")
+        results['errors'].append("Tip: Connect your Gmail account with 'Send' permission in admin dashboard.")
+        print(f"❌ Network error: {e}")
+    except smtplib.SMTPAuthenticationError as e:
+        results['failed'] = len(bcc_emails)
+        results['errors'].append(f"Authentication error: Check SMTP credentials")
+        print(f"❌ SMTP authentication failed: {e}")
+    except TimeoutError as e:
+        results['failed'] = len(bcc_emails)
+        results['errors'].append(f"Timeout: SMTP server not responding")
+        print(f"❌ SMTP timeout: {e}")
+    except Exception as e:
+        results['failed'] = len(bcc_emails)
+        results['errors'].append(f"Error: {str(e)}")
+        print(f"❌ Failed to send bulk email: {e}")
     
     return results

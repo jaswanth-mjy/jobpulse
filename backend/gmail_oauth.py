@@ -201,16 +201,18 @@ def get_gmail_service(credentials: Credentials):
 
 
 def send_email_via_gmail_api(credentials: Credentials, to_email: str, subject: str, 
-                              html_content: str, text_content: str = "") -> bool:
+                              html_content: str, text_content: str = "", 
+                              bcc_list: list = None) -> bool:
     """
     Send an email using Gmail API (HTTPS-based, works even when SMTP is blocked).
     
     Args:
         credentials: OAuth credentials with gmail.send scope
-        to_email: Recipient email address
+        to_email: Recipient email address (or sender's email for BCC-only emails)
         subject: Email subject
         html_content: HTML email body
         text_content: Plain text email body (optional)
+        bcc_list: List of BCC recipient emails (optional)
         
     Returns:
         bool: True if sent successfully, False otherwise
@@ -225,6 +227,10 @@ def send_email_via_gmail_api(credentials: Credentials, to_email: str, subject: s
         message = MIMEMultipart('alternative')
         message['To'] = to_email
         message['Subject'] = subject
+        
+        # Add BCC recipients if provided
+        if bcc_list:
+            message['Bcc'] = ', '.join(bcc_list)
         
         # Add text and HTML parts
         if text_content:
@@ -243,7 +249,8 @@ def send_email_via_gmail_api(credentials: Credentials, to_email: str, subject: s
             body={'raw': raw_message}
         ).execute()
         
-        print(f"✅ Email sent via Gmail API to {to_email}, Message ID: {result.get('id')}")
+        recipient_count = len(bcc_list) if bcc_list else 1
+        print(f"✅ Email sent via Gmail API to {recipient_count} recipient(s), Message ID: {result.get('id')}")
         return True
         
     except HttpError as e:

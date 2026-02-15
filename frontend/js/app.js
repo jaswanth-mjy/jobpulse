@@ -2283,19 +2283,20 @@ async function checkOAuthStatus() {
             // Only show OAuth option to admins
             if (!isAdmin) {
                 oauthCard.style.display = "none";
-            } else {
-                oauthCard.style.display = oauthAvailable ? "flex" : "none";
-                if (!oauthAvailable) {
-                    oauthCard.innerHTML = `
-                        <div class="auth-method-icon" style="opacity: 0.5;">
-                            <i class="fab fa-google"></i>
-                        </div>
-                        <h3 style="opacity: 0.5;">Sign in with Google</h3>
-                        <p class="auth-method-desc" style="color: #888;">
-                            OAuth not configured on server. Use App Password method instead.
-                        </p>
-                    `;
+            } else if (oauthAvailable) {
+                // Show fully enabled OAuth card for admins
+                oauthCard.style.display = "flex";
+                oauthCard.style.opacity = "1";
+                oauthCard.style.pointerEvents = "auto";
+                const oauthBtn = $("#startOAuthBtn");
+                if (oauthBtn) {
+                    oauthBtn.disabled = false;
+                    oauthBtn.style.cursor = "pointer";
+                    oauthBtn.style.opacity = "1";
                 }
+            } else {
+                // OAuth not configured on server
+                oauthCard.style.display = "none";
             }
         }
     } catch (e) {
@@ -2322,25 +2323,48 @@ function setupGmailForm() {
     // Check OAuth availability on load
     checkOAuthStatus();
 
-    // Show app password form directly when clicking "Add Account" (since OAuth is disabled)
+    // Show auth method selection for admins, or app password form directly for regular users
     $("#showAddAccountBtn")?.addEventListener("click", async () => {
-        console.log("Add Account clicked - showing app password form");
+        console.log("Add Account clicked");
         
-        // Skip auth method selection and go directly to app password form
-        authMethodCard.style.display = "none";
-        setupCard.style.display = "block";
+        // Check if user is admin - admins get to choose between OAuth and App Password
+        let isAdmin = false;
+        if (authToken) {
+            try {
+                const adminRes = await authFetch(`${API}/admin/check`);
+                if (adminRes.ok) {
+                    const adminData = await adminRes.json();
+                    isAdmin = adminData.is_admin === true;
+                }
+            } catch (e) {
+                isAdmin = false;
+            }
+        }
         
-        // Clear and focus
-        $("#gmailEmail").value = "";
-        $("#gmailAppPassword").value = "";
-        
-        // Scroll to the form
-        setupCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        
-        // Focus with a small delay to ensure form is visible
-        setTimeout(() => {
-            $("#gmailEmail")?.focus();
-        }, 300);
+        if (isAdmin && oauthAvailable) {
+            // Show auth method selection for admins
+            console.log("Admin user - showing method selection");
+            authMethodCard.style.display = "block";
+            setupCard.style.display = "none";
+            authMethodCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            // Skip to app password form for regular users
+            console.log("Regular user - showing app password form directly");
+            authMethodCard.style.display = "none";
+            setupCard.style.display = "block";
+            
+            // Clear and focus
+            $("#gmailEmail").value = "";
+            $("#gmailAppPassword").value = "";
+            
+            // Scroll to the form
+            setupCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Focus with a small delay to ensure form is visible
+            setTimeout(() => {
+                $("#gmailEmail")?.focus();
+            }, 300);
+        }
     });
 
     // Cancel from auth method selection
