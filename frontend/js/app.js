@@ -381,32 +381,7 @@ async function handleSignUp(e) {
             if (data.pending_verification) {
                 hideAuth();
                 showVerification(email);
-                
-                // Development mode: Show verification code if email failed
-                if (data.dev_verification_code) {
-                    console.log("🔑 DEV MODE - Verification Code:", data.dev_verification_code);
-                    showToast(`⚠️ Email failed. DEV CODE: ${data.dev_verification_code}`, "warning", 15000);
-                    // Also show it in the verification modal
-                    const devCodeHint = document.createElement('div');
-                    devCodeHint.id = 'devCodeHint';
-                    devCodeHint.style.cssText = 'background: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin: 15px 0; border-radius: 8px; text-align: center;';
-                    devCodeHint.innerHTML = `
-                        <strong>🔧 DEVELOPMENT MODE</strong><br>
-                        Email sending failed. Use this code:<br>
-                        <span style="font-size: 24px; font-weight: bold; color: #667eea; letter-spacing: 4px; font-family: monospace;">${data.dev_verification_code}</span>
-                    `;
-                    const verificationForm = document.querySelector('#verificationOverlay form');
-                    if (verificationForm) {
-                        // Remove existing hint if any
-                        const existingHint = document.getElementById('devCodeHint');
-                        if (existingHint) existingHint.remove();
-                        verificationForm.insertBefore(devCodeHint, verificationForm.firstChild);
-                    }
-                } else if (data.email_sent) {
-                    showToast("📧 Verification code sent to your email!", "info");
-                } else {
-                    showToast("⚠️ Email sending is not configured. Contact admin.", "warning");
-                }
+                showToast("📧 Verification code sent to your email!", "info");
             } else {
                 // Legacy flow - skip verification
                 hideAuth();
