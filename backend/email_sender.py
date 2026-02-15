@@ -24,7 +24,8 @@ FROM_NAME = os.getenv("FROM_NAME", "JobPulse")
 def _get_admin_gmail_credentials():
     """Get Gmail OAuth credentials from admin user in DB for sending via Gmail API (HTTPS)."""
     try:
-        from database import db
+        from database import get_db
+        db = get_db()
         ADMIN_EMAILS = [os.getenv("ADMIN_EMAIL", "shramkavach@gmail.com")]
         for admin_email in ADMIN_EMAILS:
             admin_user = db.users.find_one({"email": admin_email})
@@ -42,14 +43,20 @@ def _get_admin_gmail_credentials():
 
 def _send_via_gmail_api(to_email: str, subject: str, html_content: str, text_content: str = "", bcc_list: list = None) -> bool:
     """Send email via Gmail API (HTTPS-based, works when SMTP ports are blocked)."""
+    print(f"📧 Attempting Gmail API send to {to_email}...")
     gmail_creds = _get_admin_gmail_credentials()
     if not gmail_creds:
+        print(f"⚠️  No admin Gmail OAuth credentials found - cannot use Gmail API")
         return False
     
     try:
         from gmail_oauth import credentials_from_dict, refresh_credentials_if_needed, send_email_via_gmail_api
         credentials, _ = refresh_credentials_if_needed(gmail_creds)
         result = send_email_via_gmail_api(credentials, to_email, subject, html_content, text_content, bcc_list=bcc_list)
+        if result:
+            print(f"✅ Gmail API send succeeded for {to_email}")
+        else:
+            print(f"❌ Gmail API send returned False for {to_email}")
         return result
     except Exception as e:
         print(f"⚠️  Gmail API send failed: {e}")
