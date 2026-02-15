@@ -551,8 +551,15 @@ def verify_email():
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
     }, JWT_SECRET, algorithm="HS256")
     
-    # Send welcome email (optional)
-    send_welcome_email(user["email"], user.get("name", ""))
+    # Send welcome email in background thread (optional)
+    welcome_email = user["email"]
+    welcome_name = user.get("name", "")
+    def _send_welcome_bg():
+        try:
+            send_welcome_email(welcome_email, welcome_name)
+        except Exception as e:
+            print(f"❌ Background welcome email error: {e}")
+    threading.Thread(target=_send_welcome_bg, daemon=True).start()
     
     # Check if user has Gmail connected for auto-scan
     gmail_connected = db.gmail_config.count_documents({"user_id": user_id}) > 0
@@ -662,12 +669,19 @@ def forgot_password():
         upsert=True
     )
     
-    # Send reset email
-    email_sent = send_password_reset_email(email_addr, reset_code, user.get("name", ""))
+    # Send reset email in background thread so response returns immediately
+    def _send_reset_email_background():
+        try:
+            result = send_password_reset_email(email_addr, reset_code, user.get("name", ""))
+            print(f"📧 Password reset email to {email_addr}: {'sent' if result else 'failed'}")
+        except Exception as e:
+            print(f"❌ Background password reset email error: {e}")
+    
+    threading.Thread(target=_send_reset_email_background, daemon=True).start()
     
     return jsonify({
         "message": "If that email is registered, you'll receive a password reset code shortly.",
-        "email_sent": email_sent
+        "email_sent": True
     })
 
 

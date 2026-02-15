@@ -875,16 +875,13 @@ async function handleForgotPassword() {
         
         if (res.ok) {
             forgotPasswordEmail = email;
-            showForgotSuccess("📧 Reset code sent! Check your email.");
-            showToast("Check your email for reset code", "info");
+            showToast("📧 Reset code sent! Check your email.", "info");
             
-            // Switch to reset form after 2 seconds
-            setTimeout(() => {
-                $("#forgotPasswordForm").style.display = "none";
-                $("#resetPasswordForm").style.display = "block";
-                $("#resetEmailText").textContent = `Code sent to ${email}`;
-                $("#resetCode").focus();
-            }, 2000);
+            // Switch to reset form immediately
+            $("#forgotPasswordForm").style.display = "none";
+            $("#resetPasswordForm").style.display = "block";
+            $("#resetEmailText").textContent = `Code sent to ${email}`;
+            $("#resetCode").focus();
         } else {
             showForgotError(data.error || "Failed to send reset code");
         }
