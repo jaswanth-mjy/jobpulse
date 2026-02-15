@@ -2262,20 +2262,40 @@ async function checkOAuthStatus() {
         const data = await res.json();
         oauthAvailable = data.oauth_available === true;
         
-        // Show/hide OAuth option based on availability
+        // Also check if user is admin (OAuth is only available to admins)
+        let isAdmin = false;
+        if (authToken) {
+            try {
+                const adminRes = await authFetch(`${API}/admin/check`);
+                if (adminRes.ok) {
+                    const adminData = await adminRes.json();
+                    isAdmin = adminData.is_admin === true;
+                }
+            } catch (e) {
+                // Not admin or error checking
+                isAdmin = false;
+            }
+        }
+        
+        // Show/hide OAuth option based on availability AND admin status
         const oauthCard = $("#oauthMethodCard");
         if (oauthCard) {
-            oauthCard.style.display = oauthAvailable ? "flex" : "none";
-            if (!oauthAvailable) {
-                oauthCard.innerHTML = `
-                    <div class="auth-method-icon" style="opacity: 0.5;">
-                        <i class="fab fa-google"></i>
-                    </div>
-                    <h3 style="opacity: 0.5;">Sign in with Google</h3>
-                    <p class="auth-method-desc" style="color: #888;">
-                        OAuth not configured on server. Use App Password method instead.
-                    </p>
-                `;
+            // Only show OAuth option to admins
+            if (!isAdmin) {
+                oauthCard.style.display = "none";
+            } else {
+                oauthCard.style.display = oauthAvailable ? "flex" : "none";
+                if (!oauthAvailable) {
+                    oauthCard.innerHTML = `
+                        <div class="auth-method-icon" style="opacity: 0.5;">
+                            <i class="fab fa-google"></i>
+                        </div>
+                        <h3 style="opacity: 0.5;">Sign in with Google</h3>
+                        <p class="auth-method-desc" style="color: #888;">
+                            OAuth not configured on server. Use App Password method instead.
+                        </p>
+                    `;
+                }
             }
         }
     } catch (e) {
@@ -2328,10 +2348,27 @@ function setupGmailForm() {
         authMethodCard.style.display = "none";
     });
 
-    // Start OAuth flow
+    // Start OAuth flow (admin only)
     $("#startOAuthBtn")?.addEventListener("click", async () => {
         if (!oauthAvailable) {
             showToast("OAuth is not configured on the server. Please use App Password.", "error");
+            return;
+        }
+        
+        // Double-check admin status
+        try {
+            const adminRes = await authFetch(`${API}/admin/check`);
+            if (!adminRes.ok) {
+                showToast("OAuth is only available for admin users.", "error");
+                return;
+            }
+            const adminData = await adminRes.json();
+            if (!adminData.is_admin) {
+                showToast("OAuth is only available for admin users.", "error");
+                return;
+            }
+        } catch (e) {
+            showToast("Failed to verify admin status.", "error");
             return;
         }
         
