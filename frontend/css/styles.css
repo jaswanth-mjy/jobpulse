@@ -898,6 +898,44 @@ body {
     box-shadow: 0 0 0 3px var(--accent-blue-glow);
 }
 
+/* Password toggle eye icon */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrapper input {
+    padding-right: 44px;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+    border-radius: var(--radius-sm);
+}
+
+.password-toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.password-toggle-btn:focus {
+    outline: none;
+}
+
+.password-toggle-btn i {
+    font-size: 15px;
+}
+
 .auth-submit {
     width: 100%;
     padding: 13px;

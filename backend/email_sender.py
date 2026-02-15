@@ -20,6 +20,29 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
 FROM_NAME = os.getenv("FROM_NAME", "JobPulse")
 
 
+def _get_smtp_connection():
+    """Get SMTP connection, trying SSL on 465 first (more reliable), then STARTTLS on 587."""
+    # Try SSL on port 465 first (more reliable, works on most networks)
+    try:
+        server = smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=15)
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        print(f"✅ SMTP connected via SSL (port 465)")
+        return server
+    except Exception as ssl_err:
+        print(f"⚠️  SSL port 465 failed: {ssl_err}")
+    
+    # Fallback to STARTTLS on port 587
+    try:
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15)
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        print(f"✅ SMTP connected via STARTTLS (port {SMTP_PORT})")
+        return server
+    except Exception as tls_err:
+        print(f"❌ STARTTLS port {SMTP_PORT} also failed: {tls_err}")
+        raise ConnectionError(f"Cannot connect to SMTP server. SSL(465): {ssl_err}, TLS({SMTP_PORT}): {tls_err}")
+
+
 def send_verification_email(to_email: str, verification_code: str, user_name: str = "") -> bool:
     """
     Send a verification email with a 6-digit code
@@ -275,10 +298,11 @@ JobPulse - Track Your Career Journey
         msg.attach(part2)
         
         # Send email
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
+        server = _get_smtp_connection()
+        try:
             server.send_message(msg)
+        finally:
+            server.quit()
         
         print(f"✅ Verification email sent to {to_email}")
         return True
@@ -548,10 +572,11 @@ JobPulse - Track Your Career Journey
         msg.attach(part1)
         msg.attach(part2)
         
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
+        server = _get_smtp_connection()
+        try:
             server.send_message(msg)
+        finally:
+            server.quit()
         
         print(f"✅ Welcome email sent to {to_email}")
         return True
@@ -674,10 +699,11 @@ The JobPulse Team
         msg.attach(part1)
         msg.attach(part2)
         
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
+        server = _get_smtp_connection()
+        try:
             server.send_message(msg)
+        finally:
+            server.quit()
         
         print(f"✅ Password reset email sent to {to_email}")
         return True
@@ -964,21 +990,8 @@ To unsubscribe from future updates, reply to this email with "UNSUBSCRIBE" in th
         msg.attach(part1)
         msg.attach(part2)
         
-        # Add timeout to prevent infinite hanging (30 seconds)
-        # Try TLS on port 587 first, fall back to SSL on 465
+        server = _get_smtp_connection()
         try:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
-            server.starttls()
-        except (OSError, smtplib.SMTPConnectError) as conn_err:
-            # Try SSL on port 465 as fallback
-            print(f"⚠️  Port {SMTP_PORT} failed, trying SSL port 465...")
-            try:
-                server = smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=30)
-            except Exception as ssl_err:
-                raise ConnectionError(f"Cannot connect to SMTP server. Both port {SMTP_PORT} and 465 failed. Connect Gmail in admin dashboard to use Gmail API instead.")
-        
-        try:
-            server.login(SMTP_USER, SMTP_PASSWORD)
             # SMTP send_message handles BCC properly
             server.send_message(msg)
             results['success'] = len(bcc_emails)

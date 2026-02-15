@@ -312,7 +312,12 @@
                     </div>
                     <div class="auth-field">
                         <label><i class="fas fa-lock"></i> Password</label>
-                        <input type="password" id="signinPassword" required placeholder="••••••••" minlength="6">
+                        <div class="password-input-wrapper">
+                            <input type="password" id="signinPassword" required placeholder="••••••••" minlength="6">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('signinPassword', this)" tabindex="-1">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: -10px; margin-bottom: 15px;">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: var(--text-secondary);">
@@ -363,7 +368,12 @@
                     </div>
                     <div class="auth-field">
                         <label><i class="fas fa-lock"></i> Password</label>
-                        <input type="password" id="signupPassword" required placeholder="Min 6 characters" minlength="6">
+                        <div class="password-input-wrapper">
+                            <input type="password" id="signupPassword" required placeholder="Min 6 characters" minlength="6">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('signupPassword', this)" tabindex="-1">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary auth-submit" id="signupBtn">
                         <i class="fas fa-user-plus"></i> Create Account
@@ -513,25 +523,35 @@
                 
                 <div class="auth-field">
                     <label><i class="fas fa-lock"></i> New Password</label>
-                    <input 
-                        type="password" 
-                        id="newPassword" 
-                        required 
-                        placeholder="Min 6 characters"
-                        minlength="6"
-                    >
+                    <div class="password-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="newPassword" 
+                            required 
+                            placeholder="Min 6 characters"
+                            minlength="6"
+                        >
+                        <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('newPassword', this)" tabindex="-1">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="auth-field">
                     <label><i class="fas fa-lock"></i> Confirm Password</label>
-                    <input 
-                        type="password" 
-                        id="confirmPassword" 
-                        required 
-                        placeholder="Re-enter new password"
-                        minlength="6"
-                        onkeypress="if(event.key==='Enter'){handleResetPassword();}"
-                    >
+                    <div class="password-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="confirmPassword" 
+                            required 
+                            placeholder="Re-enter new password"
+                            minlength="6"
+                            onkeypress="if(event.key==='Enter'){handleResetPassword();}"
+                        >
+                        <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('confirmPassword', this)" tabindex="-1">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <button 
@@ -1036,7 +1056,12 @@
                                     </div>
                                     <div class="form-group">
                                         <label for="gmailAppPassword"><i class="fas fa-key"></i> App Password</label>
-                                        <input type="password" id="gmailAppPassword" required placeholder="xxxx xxxx xxxx xxxx" minlength="16" maxlength="19">
+                                        <div class="password-input-wrapper">
+                                            <input type="password" id="gmailAppPassword" required placeholder="xxxx xxxx xxxx xxxx" minlength="16" maxlength="19">
+                                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('gmailAppPassword', this)" tabindex="-1">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="gmail-actions">

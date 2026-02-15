@@ -198,10 +198,15 @@ def signup():
     )
     
     # Send verification email
+    print(f"📧 Attempting to send verification email to {email_addr} with code {verification_code}")
     email_sent = send_verification_email(email_addr, verification_code, name)
+    print(f"📧 Email sending result: {email_sent}")
     
     if not email_sent:
         print(f"⚠️  Failed to send verification email to {email_addr}")
+        print(f"🔑 DEVELOPMENT MODE - Verification code: {verification_code}")
+    else:
+        print(f"✅ Successfully sent verification email to {email_addr}")
 
     # Generate temporary token (will be upgraded after verification)
     temp_token = jwt.encode({
@@ -211,13 +216,21 @@ def signup():
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
     }, JWT_SECRET, algorithm="HS256")
 
-    return jsonify({
+    # In development, include code if email failed (for testing)
+    response_data = {
         "message": "Account created! Please verify your email.",
         "token": temp_token,
         "user": {"id": user_id, "name": name, "email": email_addr, "email_verified": False},
         "pending_verification": True,
         "email_sent": email_sent,
-    }), 201
+    }
+    
+    # DEVELOPMENT ONLY: Include verification code if email didn't send
+    if not email_sent:
+        response_data["dev_verification_code"] = verification_code
+        response_data["dev_message"] = "Email sending failed. Use this code for testing."
+    
+    return jsonify(response_data), 201
 
 
 @app.route("/api/auth/signin", methods=["POST"])
