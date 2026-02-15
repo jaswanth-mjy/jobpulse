@@ -30,35 +30,49 @@ function getAuthHeaders() {
 
 // ========== INIT ==========
 document.addEventListener("DOMContentLoaded", async () => {
+    console.log("Admin page loaded");
+    console.log("Auth token from sessionStorage:", sessionStorage.getItem("jobpulse_token") ? "exists" : "null");
+    console.log("Auth token from localStorage:", localStorage.getItem("jobpulse_token") ? "exists" : "null");
+    console.log("Final authToken:", authToken ? "exists" : "null");
+    
     // Check if user is logged in
     if (!authToken) {
+        console.log("No auth token - showing login required");
         showLoginRequired();
         return;
     }
 
     // Check if user is admin
     try {
+        console.log("Checking admin status...");
         const res = await fetch(`${API}/admin/check`, {
             headers: getAuthHeaders()
         });
 
+        console.log("Admin check response status:", res.status);
+
         if (!res.ok) {
             if (res.status === 401) {
+                console.log("401 - showing login required");
                 showLoginRequired();
             } else {
+                console.log("Non-OK response - showing access denied");
                 showAccessDenied();
             }
             return;
         }
 
         const data = await res.json();
+        console.log("Admin check data:", data);
         
         if (!data.is_admin) {
+            console.log("Not admin - showing access denied");
             showAccessDenied();
             return;
         }
 
         // User is admin - show dashboard
+        console.log("User is admin - showing dashboard");
         showDashboard(data.email);
         await loadStats();
         await loadUsers(1);
@@ -88,16 +102,20 @@ function showDashboard(email) {
 
 // ========== LOAD STATS ==========
 async function loadStats() {
+    console.log("Loading stats...");
     try {
         const res = await fetch(`${API}/admin/stats`, {
             headers: getAuthHeaders()
         });
+
+        console.log("Stats response status:", res.status);
 
         if (!res.ok) {
             throw new Error("Failed to load stats");
         }
 
         const data = await res.json();
+        console.log("Stats data:", data);
 
         // Update stat cards
         $("#totalUsers").textContent = formatNumber(data.total_users);
@@ -110,6 +128,8 @@ async function loadStats() {
         // Update last updated timestamp
         const timestamp = new Date(data.timestamp);
         $("#lastUpdated").textContent = timestamp.toLocaleString();
+
+        console.log("Stats loaded successfully");
 
     } catch (error) {
         console.error("Error loading stats:", error);

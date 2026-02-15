@@ -1316,6 +1316,10 @@ function setupEventListeners() {
     // Navigation
     $$(".nav-item").forEach((item) => {
         item.addEventListener("click", (e) => {
+            // Allow admin link to navigate normally (it has a real href)
+            if (item.id === 'adminLink') {
+                return; // Don't prevent default - let it navigate to /admin
+            }
             e.preventDefault();
             setView(item.dataset.view);
         });

@@ -1878,6 +1878,7 @@ def check_admin():
     """Check if current user is an admin."""
     user_email = g.get("user_email", "").lower()
     is_admin = user_email in [email.lower() for email in ADMIN_EMAILS]
+    print(f"🔐 Admin check: email={user_email}, is_admin={is_admin}, ADMIN_EMAILS={ADMIN_EMAILS}")
     return jsonify({"is_admin": is_admin, "email": user_email})
 
 
