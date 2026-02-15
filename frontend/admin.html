@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — JobPulse</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+    <!-- Access Denied Page (shown when not admin) -->
+    <div id="accessDenied" class="access-denied-page" style="display: none;">
+        <div class="access-denied-content">
+            <i class="fas fa-lock"></i>
+            <h1>Access Denied</h1>
+            <p>You don't have permission to access the admin dashboard.</p>
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> Back to JobPulse
+            </a>
+        </div>
+    </div>
+
+    <!-- Login Required Page -->
+    <div id="loginRequired" class="access-denied-page" style="display: none;">
+        <div class="access-denied-content">
+            <i class="fas fa-sign-in-alt"></i>
+            <h1>Login Required</h1>
+            <p>Please sign in to access the admin dashboard.</p>
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> Sign In
+            </a>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <p>Verifying admin access...</p>
+    </div>
+
+    <!-- Admin Dashboard (shown when admin) -->
+    <div id="adminDashboard" class="admin-dashboard" style="display: none;">
+        <!-- Header -->
+        <header class="admin-header">
+            <div class="admin-header-left">
+                <a href="/" class="admin-logo">
+                    <i class="fas fa-briefcase"></i>
+                    <span>JobPulse</span>
+                </a>
+                <span class="admin-badge">Admin</span>
+            </div>
+            <div class="admin-header-right">
+                <span id="adminEmail" class="admin-email"></span>
+                <a href="/" class="btn btn-ghost">
+                    <i class="fas fa-arrow-left"></i> Back to App
+                </a>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <div class="admin-container">
+                <h1 class="admin-title">
+                    <i class="fas fa-chart-line"></i>
+                    Admin Dashboard
+                </h1>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon users">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalUsers">-</span>
+                            <span class="stat-label">Total Users</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon verified">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="verifiedUsers">-</span>
+                            <span class="stat-label">Verified Users</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon recent">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="recentUsers7d">-</span>
+                            <span class="stat-label">New (7 days)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon monthly">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="recentUsers30d">-</span>
+                            <span class="stat-label">New (30 days)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon applications">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalApplications">-</span>
+                            <span class="stat-label">Total Applications</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon gmail">
+                            <i class="fab fa-google"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="gmailConnected">-</span>
+                            <span class="stat-label">Gmail Connected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="users-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-list"></i> Registered Users</h2>
+                        <button class="btn btn-ghost" onclick="refreshStats()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="users-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Verified</th>
+                                    <th>Applications</th>
+                                    <th>Gmail</th>
+                                    <th>Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr>
+                                    <td colspan="7" class="loading-row">
+                                        <div class="spinner small"></div>
+                                        Loading users...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Pagination -->
+                    <div class="pagination" id="pagination"></div>
+                </div>
+
+                <!-- Footer -->
+                <div class="admin-footer">
+                    <p>Last updated: <span id="lastUpdated">-</span></p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>

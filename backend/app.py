@@ -41,6 +41,9 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "jobpulse-secret-change-me-in-producti
 JWT_EXPIRY_HOURS = 72
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 
+# Admin email(s) - only these users can access admin features
+ADMIN_EMAILS = ["shramkavach@gmail.com"]
+
 # ---- Encryption for sensitive data (Gmail app passwords) ----
 ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY", "")
 if ENCRYPTION_KEY:
@@ -123,6 +126,17 @@ def require_verified_email(f):
     def decorated(*args, **kwargs):
         if not g.get("verified", False):
             return jsonify({"error": "Email verification required"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_admin(f):
+    """Decorator — require admin privileges (use after @require_auth)."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user_email = g.get("user_email", "").lower()
+        if user_email not in [email.lower() for email in ADMIN_EMAILS]:
+            return jsonify({"error": "Admin access required"}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -1855,6 +1869,125 @@ def gmail_oauth_accounts():
 
 
 # ============================================================
+#  ADMIN ROUTES
+# ============================================================
+
+@app.route("/api/admin/check", methods=["GET"])
+@require_auth
+def check_admin():
+    """Check if current user is an admin."""
+    user_email = g.get("user_email", "").lower()
+    is_admin = user_email in [email.lower() for email in ADMIN_EMAILS]
+    return jsonify({"is_admin": is_admin, "email": user_email})
+
+
+@app.route("/api/admin/stats", methods=["GET"])
+@require_auth
+@require_admin
+def admin_stats():
+    """Get admin statistics - user counts and app usage metrics."""
+    try:
+        db = get_db()
+        
+        # Total users
+        total_users = db.users.count_documents({})
+        
+        # Verified users
+        verified_users = db.users.count_documents({"email_verified": True})
+        
+        # Users registered in last 7 days
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        # Handle both string and datetime formats for created_at
+        recent_users = db.users.count_documents({
+            "$or": [
+                {"created_at": {"$gte": week_ago}},
+                {"created_at": {"$gte": week_ago.isoformat()}}
+            ]
+        })
+        
+        # Users registered in last 30 days
+        month_ago = datetime.utcnow() - timedelta(days=30)
+        monthly_users = db.users.count_documents({
+            "$or": [
+                {"created_at": {"$gte": month_ago}},
+                {"created_at": {"$gte": month_ago.isoformat()}}
+            ]
+        })
+        
+        # Total applications
+        total_applications = db.applications.count_documents({})
+        
+        # Users with Gmail connected
+        gmail_connected = db.gmail_config.count_documents({})
+        
+        return jsonify({
+            "total_users": total_users,
+            "verified_users": verified_users, 
+            "unverified_users": total_users - verified_users,
+            "recent_users_7d": recent_users,
+            "recent_users_30d": monthly_users,
+            "total_applications": total_applications,
+            "gmail_connected_users": gmail_connected,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/users", methods=["GET"])
+@require_auth
+@require_admin
+def admin_users():
+    """Get list of all registered users with their stats."""
+    try:
+        db = get_db()
+        
+        # Get pagination params
+        page = int(request.args.get("page", 1))
+        limit = int(request.args.get("limit", 50))
+        skip = (page - 1) * limit
+        
+        # Get users with pagination
+        users_cursor = db.users.find({}, {
+            "password": 0,  # Exclude password
+        }).sort("created_at", -1).skip(skip).limit(limit)
+        
+        users = []
+        for user in users_cursor:
+            user_id = user["_id"]
+            
+            # Count applications for this user
+            app_count = db.applications.count_documents({"user_id": user_id})
+            
+            # Check if Gmail connected
+            gmail_connected = db.gmail_config.find_one({"user_id": user_id}) is not None
+            
+            users.append({
+                "id": str(user_id),
+                "name": user.get("name", ""),
+                "email": user.get("email", ""),
+                "email_verified": user.get("email_verified", False),
+                "created_at": user.get("created_at", ""),
+                "application_count": app_count,
+                "gmail_connected": gmail_connected,
+            })
+        
+        total_users = db.users.count_documents({})
+        
+        return jsonify({
+            "users": users,
+            "total": total_users,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total_users + limit - 1) // limit
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================
 #  HEALTH CHECK (for Render)
 # ============================================================
 
@@ -1871,6 +2004,12 @@ def health_check():
 @app.route("/")
 def serve_index():
     return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/admin")
+def serve_admin():
+    """Serve admin dashboard page."""
+    return send_from_directory(FRONTEND_DIR, "admin.html")
 
 
 @app.route("/<path:path>")
