@@ -13,6 +13,9 @@ let authToken = sessionStorage.getItem("jobpulse_token") || localStorage.getItem
 let currentPage = 1;
 const pageLimit = 20;
 
+// Store users data for detail view
+let usersData = [];
+
 // DOM helpers
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -120,7 +123,7 @@ async function loadUsers(page = 1) {
     const tbody = $("#usersTableBody");
     tbody.innerHTML = `
         <tr>
-            <td colspan="7" class="loading-row">
+            <td colspan="8" class="loading-row">
                 <div class="spinner small"></div>
                 Loading users...
             </td>
@@ -137,12 +140,13 @@ async function loadUsers(page = 1) {
         }
 
         const data = await res.json();
+        usersData = data.users; // Store for detail view
 
         // Render users table
         if (data.users.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="loading-row">
+                    <td colspan="8" class="loading-row">
                         No users found
                     </td>
                 </tr>
@@ -151,8 +155,22 @@ async function loadUsers(page = 1) {
             tbody.innerHTML = data.users.map((user, index) => `
                 <tr>
                     <td>${(page - 1) * pageLimit + index + 1}</td>
-                    <td>${escapeHtml(user.name) || '-'}</td>
-                    <td>${escapeHtml(user.email)}</td>
+                    <td>
+                        <div class="user-cell">
+                            ${user.picture 
+                                ? `<img src="${escapeHtml(user.picture)}" class="user-avatar-small" alt="avatar">`
+                                : '<i class="fas fa-user-circle user-avatar-icon"></i>'}
+                            <div class="user-cell-info">
+                                <span class="user-cell-name">${escapeHtml(user.name) || '-'}</span>
+                                <span class="user-cell-email">${escapeHtml(user.email)}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        ${user.auth_provider === 'google' 
+                            ? '<span class="badge google"><i class="fab fa-google"></i> Google</span>'
+                            : '<span class="badge email"><i class="fas fa-envelope"></i> Email</span>'}
+                    </td>
                     <td>
                         ${user.email_verified 
                             ? '<span class="badge success"><i class="fas fa-check"></i> Yes</span>'
@@ -163,10 +181,15 @@ async function loadUsers(page = 1) {
                     </td>
                     <td>
                         ${user.gmail_connected 
-                            ? '<span class="badge success"><i class="fab fa-google"></i> Yes</span>'
-                            : '<span class="badge warning">No</span>'}
+                            ? `<span class="badge success" title="${user.gmail_emails?.join(', ') || ''}"><i class="fab fa-google"></i> ${user.gmail_emails?.length || 1}</span>`
+                            : '<span class="badge muted">-</span>'}
                     </td>
                     <td>${formatDate(user.created_at)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-ghost" onclick="showUserDetail('${user.id}')" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
                 </tr>
             `).join('');
         }
@@ -178,7 +201,7 @@ async function loadUsers(page = 1) {
         console.error("Error loading users:", error);
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="loading-row">
+                <td colspan="8" class="loading-row">
                     Error loading users. Please try again.
                 </td>
             </tr>
@@ -267,4 +290,109 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+// ========== USER DETAIL MODAL ==========
+function showUserDetail(userId) {
+    const user = usersData.find(u => u.id === userId);
+    if (!user) return;
+    
+    const content = $("#userDetailContent");
+    content.innerHTML = `
+        <div class="user-detail-header">
+            ${user.picture 
+                ? `<img src="${escapeHtml(user.picture)}" class="user-detail-avatar" alt="avatar">`
+                : '<div class="user-detail-avatar-placeholder"><i class="fas fa-user"></i></div>'}
+            <div class="user-detail-name-section">
+                <h3>${escapeHtml(user.name) || 'No Name'}</h3>
+                <p>${escapeHtml(user.email)}</p>
+            </div>
+        </div>
+        
+        <div class="user-detail-grid">
+            <div class="detail-item">
+                <label><i class="fas fa-id-badge"></i> User ID</label>
+                <span class="detail-value mono">${user.id}</span>
+            </div>
+            
+            <div class="detail-item">
+                <label><i class="fas fa-sign-in-alt"></i> Auth Method</label>
+                <span class="detail-value">
+                    ${user.auth_provider === 'google' 
+                        ? '<span class="badge google"><i class="fab fa-google"></i> Google OAuth</span>'
+                        : '<span class="badge email"><i class="fas fa-envelope"></i> Email/Password</span>'}
+                </span>
+            </div>
+            
+            <div class="detail-item">
+                <label><i class="fas fa-check-circle"></i> Email Verified</label>
+                <span class="detail-value">
+                    ${user.email_verified 
+                        ? '<span class="badge success"><i class="fas fa-check"></i> Verified</span>'
+                        : '<span class="badge warning"><i class="fas fa-times"></i> Not Verified</span>'}
+                </span>
+            </div>
+            
+            <div class="detail-item">
+                <label><i class="fas fa-calendar-check"></i> Verified At</label>
+                <span class="detail-value">${formatDateTime(user.email_verified_at)}</span>
+            </div>
+            
+            <div class="detail-item">
+                <label><i class="fas fa-calendar-plus"></i> Account Created</label>
+                <span class="detail-value">${formatDateTime(user.created_at)}</span>
+            </div>
+            
+            <div class="detail-item">
+                <label><i class="fas fa-file-alt"></i> Applications</label>
+                <span class="detail-value"><span class="badge info">${user.application_count} applications</span></span>
+            </div>
+            
+            <div class="detail-item full-width">
+                <label><i class="fab fa-google"></i> Gmail Connections</label>
+                <span class="detail-value">
+                    ${user.gmail_connected 
+                        ? `<div class="gmail-list">${user.gmail_emails?.map(e => `<span class="badge success"><i class="fas fa-envelope"></i> ${escapeHtml(e)}</span>`).join('') || '<span class="badge success">Connected</span>'}</div>`
+                        : '<span class="badge muted">Not Connected</span>'}
+                </span>
+            </div>
+        </div>
+    `;
+    
+    $("#userDetailModal").style.display = "flex";
+}
+
+function closeUserModal() {
+    $("#userDetailModal").style.display = "none";
+}
+
+// Close modal on overlay click
+document.addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal-overlay")) {
+        e.target.style.display = "none";
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        closeUserModal();
+    }
+});
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return '-';
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return '-';
+    }
 }

@@ -139,17 +139,18 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Name</th>
-                                    <th>Email</th>
+                                    <th>User</th>
+                                    <th>Auth Method</th>
                                     <th>Verified</th>
-                                    <th>Applications</th>
+                                    <th>Apps</th>
                                     <th>Gmail</th>
                                     <th>Joined</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="usersTableBody">
                                 <tr>
-                                    <td colspan="7" class="loading-row">
+                                    <td colspan="8" class="loading-row">
                                         <div class="spinner small"></div>
                                         Loading users...
                                     </td>
@@ -167,6 +168,19 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- User Detail Modal -->
+    <div class="modal-overlay" id="userDetailModal" style="display: none;">
+        <div class="modal-content user-detail-modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-user"></i> User Details</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="userDetailContent">
+                <!-- Content populated by JS -->
+            </div>
+        </div>
     </div>
 
     <script src="js/admin.js"></script>

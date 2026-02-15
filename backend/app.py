@@ -1960,17 +1960,36 @@ def admin_users():
             # Count applications for this user
             app_count = db.applications.count_documents({"user_id": user_id})
             
-            # Check if Gmail connected
-            gmail_connected = db.gmail_config.find_one({"user_id": user_id}) is not None
+            # Check if Gmail connected and get details
+            gmail_config = db.gmail_config.find_one({"user_id": user_id})
+            gmail_connected = gmail_config is not None
+            gmail_emails = []
+            if gmail_config:
+                gmail_emails = [gmail_config.get("email", "")] if gmail_config.get("email") else []
+            
+            # Get all connected Gmail accounts
+            gmail_accounts = list(db.gmail_config.find({"user_id": user_id}))
+            gmail_emails = [acc.get("email", "") for acc in gmail_accounts if acc.get("email")]
+            
+            # Determine auth provider
+            auth_provider = user.get("auth_provider", "email")
+            if not auth_provider and user.get("password") == "":
+                auth_provider = "google"
+            elif not auth_provider:
+                auth_provider = "email"
             
             users.append({
                 "id": str(user_id),
                 "name": user.get("name", ""),
                 "email": user.get("email", ""),
                 "email_verified": user.get("email_verified", False),
+                "email_verified_at": user.get("email_verified_at", ""),
                 "created_at": user.get("created_at", ""),
+                "auth_provider": auth_provider,
+                "picture": user.get("picture", ""),
                 "application_count": app_count,
                 "gmail_connected": gmail_connected,
+                "gmail_emails": gmail_emails,
             })
         
         total_users = db.users.count_documents({})
