@@ -83,6 +83,13 @@ REJECT_SUBJECT_PATTERNS = [
 
     # --- Indeed job match format ---
     r"@\s+.+$",  # "Role @ Company" format from Indeed matches
+    
+    # --- Great match / job recommendation patterns ---
+    r"great\s+match\s+for",
+    r"perfect\s+match\s+for",
+    r"ideal\s+match\s+for",
+    r"you.?re\s+a\s+great\s+match",
+    r"you.?re\s+a\s+perfect\s+match",
 ]
 
 _REJECT_RE = re.compile(
@@ -577,6 +584,12 @@ ROLE_GARBAGE_PHRASES = [
     "status",
     "notification",
     "confirmation",
+    # Match patterns (these are from job alerts, not real roles)
+    "great match",
+    "perfect match",
+    "ideal match",
+    "good match",
+    "strong match",
 ]
 
 
@@ -598,6 +611,11 @@ def _is_role_garbage(text):
     # Too short - single letter or 1-2 char "roles" are garbage
     if len(low) <= 2:
         return True
+    # Check for repeated words (like "a a" or "the the")
+    words = low.split()
+    for i in range(len(words) - 1):
+        if words[i] == words[i + 1]:
+            return True
     # Single capitalised word with NO job-title keyword → likely a company
     # fragment or name, not a role (e.g. "Turbotech", "Barclays")
     words = low.split()
@@ -953,7 +971,27 @@ def _is_rejection_email(subject, body_preview):
 def _is_interview_email(subject, body_preview):
     """Return True if the email is an interview invitation or next-step notice."""
     combined = (subject + " " + body_preview).lower()
-    return any(kw in combined for kw in INTERVIEW_KEYWORDS)
+    
+    # First check if it contains interview keywords
+    has_interview_keyword = any(kw in combined for kw in INTERVIEW_KEYWORDS)
+    if not has_interview_keyword:
+        return False
+    
+    # Reject if it's a job alert/recommendation pattern
+    alert_patterns = [
+        r"great\s+match\s+for",
+        r"perfect\s+match\s+for",
+        r"ideal\s+match\s+for",
+        r"recommended\s+for\s+you",
+        r"jobs?\s+matching",
+        r"jobs?\s+you\s+(?:may|might)\s+(?:like|be\s+interested)",
+        r"\d+\s+(?:new\s+)?jobs?",
+    ]
+    for pattern in alert_patterns:
+        if re.search(pattern, combined, re.IGNORECASE):
+            return False
+    
+    return True
 
 
 def _is_assessment_email(subject, body_preview):
