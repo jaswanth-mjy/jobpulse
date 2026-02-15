@@ -148,6 +148,7 @@ function handleOnboardingAction(action) {
 async function initApp() {
     await loadMeta();
     await refreshData();
+    await checkAdminStatus();
     setupEventListeners();
     checkGmailStatus();
     setView("dashboard");
@@ -937,6 +938,25 @@ async function loadMeta() {
     } catch (e) {
         console.error("Failed to load metadata:", e);
         showToast("Cannot connect to server. Is the backend running?", "error");
+    }
+}
+
+// ========== CHECK ADMIN STATUS ==========
+async function checkAdminStatus() {
+    try {
+        const res = await authFetch(`${API}/admin/check`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.is_admin) {
+                const adminLink = $("#adminLink");
+                if (adminLink) {
+                    adminLink.style.display = "flex";
+                }
+            }
+        }
+    } catch (e) {
+        // Silently fail - user is just not an admin
+        console.log("Admin check failed:", e);
     }
 }
 

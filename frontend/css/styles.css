@@ -1064,6 +1064,22 @@ body {
 
 .nav-item i { width: 20px; text-align: center; }
 
+/* Admin Link - Special styling */
+.nav-item.admin-link {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1));
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #f59e0b;
+}
+
+.nav-item.admin-link:hover {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.2));
+    border-color: rgba(245, 158, 11, 0.5);
+}
+
+.nav-item.admin-link i {
+    color: #f59e0b;
+}
+
 .sidebar-footer {
     padding: 16px 12px;
     border-top: 1px solid var(--border-color);
