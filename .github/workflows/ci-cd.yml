@@ -207,6 +207,7 @@ jobs:
     
     steps:
       - name: Check Render Deploy Hook
+        id: check-hook
         run: |
           if [ -z "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
             echo "⚠️  RENDER_DEPLOY_HOOK secret is not configured"
@@ -216,12 +217,14 @@ jobs:
             echo "   3. Add to GitHub: Settings → Secrets → Actions → RENDER_DEPLOY_HOOK"
             echo "   4. See .github/SECRETS.md for detailed instructions"
             echo "🔧 Manual deployment: Push to main branch (render.yaml configured)"
-            exit 0  # Don't fail the workflow, just skip
+            echo "has_hook=false" >> $GITHUB_OUTPUT
+          else
+            echo "✓ Render deploy hook configured"
+            echo "has_hook=true" >> $GITHUB_OUTPUT
           fi
-          echo "✓ Render deploy hook configured"
       
       - name: Trigger Render Deployment
-        if: secrets.RENDER_DEPLOY_HOOK != ''
+        if: steps.check-hook.outputs.has_hook == 'true'
         run: |
           HTTP_CODE=$(curl -X POST -o /dev/null -w "%{http_code}" ${{ secrets.RENDER_DEPLOY_HOOK }})
           if [ $HTTP_CODE -eq 200 ] || [ $HTTP_CODE -eq 201 ]; then
